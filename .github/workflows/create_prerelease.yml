@@ -1,4 +1,4 @@
-name: Create LABDOS Pre-Release (BETA)
+name: Create Pre-Release (BETA)
 
 on:
   workflow_dispatch:
