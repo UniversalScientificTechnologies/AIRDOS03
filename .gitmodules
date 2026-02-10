@@ -1,0 +1,3 @@
+[submodule "fw/UAVDOS/src/mavlink"]
+	path = fw/UAVDOS/src/mavlink
+	url = git@github.com:mavlink/c_library_v2.git
