@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: UAVDOS
+          - name: AIRDOS03
             type: UAVDOS
             fqbn: clock=8MHz_external
             channels: 0
