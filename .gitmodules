@@ -1,3 +1,9 @@
 [submodule "fw/UAVDOS/src/mavlink"]
 	path = fw/AIRDOS03_MAVLink/src/mavlink
 	url = git@github.com:mavlink/c_library_v2.git
+[submodule "hw/modules/USTSIPIN03"]
+	path = hw/modules/USTSIPIN03
+	url = git@github.com:ust-modules/USTSIPIN03.git
+[submodule "hw/modules/TFUNIPAYLOAD01"]
+	path = hw/modules/TFUNIPAYLOAD01
+	url = git@github.com:ThunderFly-aerospace/TFUNIPAYLOAD01.git
