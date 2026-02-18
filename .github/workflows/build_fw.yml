@@ -18,7 +18,12 @@ jobs:
       matrix:
         include:
           - name: AIRDOS03
-            type: UAVDOS
+            type: AIRDOS03_MAVLink
+            fqbn: clock=8MHz_external
+            channels: 0
+
+          - name: AIRDOS03
+            type: AIRDOS03_USTDFF
             fqbn: clock=8MHz_external
             channels: 0
 
