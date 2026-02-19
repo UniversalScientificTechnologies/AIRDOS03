@@ -8,7 +8,7 @@ String FWversion = "UAV00"; // 8 MHz crystal
 #include <Wire.h>
 #include <SPI.h>
 #include "githash.h"
-#include "src/mavlink/common/mavlink.h"
+#include "mavlink/common/mavlink.h"
 
 #define CONV        0    // PB0, ADC CONV signal
 #define DRESET      22   // PC6, peak detector reset / ADC CONV
