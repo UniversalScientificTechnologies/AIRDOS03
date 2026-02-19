@@ -1,6 +1,5 @@
 #include <Arduino.h>
-#define TYPE "AIRDOS04X"
-#define DIGTYPE "BATDATUNIT01B"
+#define TYPE "AIRDOS03B"
 #define ADCTYPE "USTSIPIN03A"
 
 #define MAJOR 1
@@ -20,13 +19,21 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #define CONV        0    // PB0, ADC CONV signal
 #define DRESET      22   // PC6, ADC CONV command
 #define DSET        23   // PC7, ADC chip enable
-#define LED1        12   // PD4
-#define LED2        13   // PD5
-#define LED3        14   // PD6
-#define BUZZER      15   // PD7
+#ifndef PIN_LED_RED
+#define PIN_LED_RED   21
+#endif
+#ifndef PIN_LED_BLUE
+#define PIN_LED_BLUE  22
+#endif
+#ifndef PIN_LED_GREEN
+#define PIN_LED_GREEN 23
+#endif
+#define LED1        PIN_LED_RED   // red
+#define LED2        PIN_LED_BLUE  // blue
+#define LED3        PIN_LED_GREEN // green
+#define BUZZER      15            // PD7
 #define POWER5V     26   // PA2
 #define POWER3V3    2    // PB2
-#define SPI_MUX_SEL 18   // PC2
 #define EXT_I2C_EN  20   // PC4
 #define ACONNECT    27   // PA3
 
@@ -34,8 +41,6 @@ uint16_t count = 0;
 uint8_t histogram[CHANNELS];
 uint8_t ADCconf1;
 uint8_t ADCconf2;
-uint8_t DIGconf1;
-uint8_t DIGconf2;
 
 unsigned long lastDataOutMs = 0;
 unsigned long lastStatusMs = 0;
@@ -123,19 +128,11 @@ void setup()
   pinMode(CONV, INPUT);
   pinMode(DRESET, OUTPUT);
   pinMode(DSET, OUTPUT);
-  pinMode(SPI_MUX_SEL, OUTPUT);
-  pinMode(EXT_I2C_EN, OUTPUT);
-  pinMode(POWER3V3, OUTPUT);
-  pinMode(POWER5V, OUTPUT);
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
   pinMode(BUZZER, OUTPUT);
 
-  digitalWrite(SPI_MUX_SEL, HIGH); // ADC selected
-  digitalWrite(EXT_I2C_EN, HIGH);  // Enable external I2C (SN + optional env)
-  digitalWrite(POWER3V3, HIGH);
-  digitalWrite(POWER5V, HIGH);
   digitalWrite(DSET, HIGH);
   digitalWrite(DRESET, HIGH);
 
@@ -145,18 +142,6 @@ void setup()
   Serial.print(dataString);
   printHexSN(0x5B); // analog board SN
 
-  Serial.print("\r\n$DIG," DIGTYPE ",");
-  printHexSN(0x58);
-  Serial.print(",");
-  Wire.beginTransmission(0x50);
-  Wire.write((int)0x00);
-  Wire.write((int)0x00);
-  Wire.endTransmission();
-  Wire.requestFrom((uint8_t)0x50, (uint8_t)2);
-  DIGconf1 = Wire.read();
-  DIGconf2 = Wire.read();
-  Serial.print(DIGconf1, HEX);
-  Serial.print(DIGconf2, HEX);
 
   Serial.print("\r\n$ADC," ADCTYPE ",");
   printHexSN(0x5B);
@@ -184,7 +169,7 @@ void setup()
 
 void loop()
 {
-  while ((PINB & 1) != 0)
+  if ((PINB & 1) != 0)
   {
     digitalWrite(DRESET, LOW);
     uint16_t adcVal = SPI.transfer16(0x0000);
