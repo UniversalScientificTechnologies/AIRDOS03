@@ -3,8 +3,17 @@ name: Build firmware
 on:
   push:
     paths:
-    - 'fw/**'
-    - '*/*.yml'    
+      - 'fw/**'
+      - '.github/workflows/*.yml'
+      - '!fw/build/**'
+      - '!fw/**/src/githash.h'
+      - '!fw/**/nextversion'
+  pull_request:
+    paths:
+      - 'fw/**'
+      - '.github/workflows/*.yml'
+      - '!fw/**/src/githash.h'
+      - '!fw/**/nextversion'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -12,46 +21,63 @@ on:
         required: false
         type: string
 jobs:
+  load-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load matrix from file
+        id: set-matrix
+        run: |
+          MATRIX=$(python3 -c "import yaml, json; print(json.dumps({'include': yaml.safe_load(open('fw/build_matrix.yaml'))}))")
+          echo "matrix=${MATRIX}" >> $GITHUB_OUTPUT
+
   build:
     runs-on: ubuntu-latest
+    needs: load-matrix
     strategy:
-      matrix:
-        include:
-          - name: AIRDOS03
-            type: AIRDOS03_MAVLink
-            fqbn: clock=8MHz_external
-            channels: 0
-
-          - name: AIRDOS03
-            type: AIRDOS03_USTDFF
-            fqbn: clock=8MHz_external
-            channels: 0
+      matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
 
     steps:
-        - name: Checkout
-          uses: actions/checkout@v4
-          continue-on-error: true
-          with:
-            submodules: True
-        
-        - name: Update githash.h and compile  
-          run: |
-            BUILD_TYPE="${{ inputs.build_type }}"
-            BT="CIBuild"
-            if [ "$BUILD_TYPE" = "B" ]; then
-              BT="Beta"
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.pat }}
+
+      - name: Update githash.h and compile
+        run: |
+          set -euo pipefail
+
+          BUILD_TYPE="${{ inputs.build_type }}"
+          BT="CIBuild"
+          if [ "$BUILD_TYPE" = "B" ]; then
+            BT="Beta"
+          fi
+          if [ "$BUILD_TYPE" = "R" ]; then
+            BT="Release"
+          fi
+
+          NEXTBUILD=0
+          if [ "${{ matrix.versioned }}" = "true" ]; then
+            NEXTVERSION_PATH="fw/${{ matrix.type }}/nextversion"
+            if [ -f "$NEXTVERSION_PATH" ]; then
+              PREVMAJOR=$(grep '^MAJOR ' "$NEXTVERSION_PATH" | awk '{print $2}')
+              PREVMINOR=$(grep '^MINOR ' "$NEXTVERSION_PATH" | awk '{print $2}')
+              NEXTRELEASE=$(grep '^RELEASE ' "$NEXTVERSION_PATH" | awk '{print $2}')
+              NEXTBUILD=$(grep '^BUILD ' "$NEXTVERSION_PATH" | awk '{print $2}')
+            else
+              PREVMAJOR=$(grep '^#define MAJOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
+              PREVMINOR=$(grep '^#define MINOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
+              NEXTRELEASE=0
+              NEXTBUILD=0
             fi
-            if [ "$BUILD_TYPE" = "R" ]; then
-              BT="Release"
-            fi 
 
-            PREVMAJOR=`cat fw/${{ matrix.type }}/nextversion|grep MAJOR|cut -d ' ' -f 2`
-            PREVMINOR=`cat fw/${{ matrix.type }}/nextversion|grep MINOR|cut -d ' ' -f 2`
-            NEXTRELEASE=`cat fw/${{ matrix.type }}/nextversion|grep RELEASE|cut -d ' ' -f 2`
-            NEXTBUILD=`cat fw/${{ matrix.type }}/nextversion|grep BUILD|cut -d ' ' -f 2`
-
-            CURMAJOR=`cat fw/${{ matrix.type }}/${{ matrix.type }}.ino|grep MAJOR|head -n 1|cut -d ' ' -f 3`
-            CURMINOR=`cat fw/${{ matrix.type }}/${{ matrix.type }}.ino|grep MINOR|head -n 1|cut -d ' ' -f 3`
+            CURMAJOR=$(grep '^#define MAJOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
+            CURMINOR=$(grep '^#define MINOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
 
             if [ "$CURMAJOR" = "$PREVMAJOR" ] && [ "$CURMINOR" = "$PREVMINOR" ]; then
               echo "Same version"
@@ -66,75 +92,76 @@ jobs:
             echo "#define GHBUILD ${NEXTBUILD}" >> githash.h
             echo "#define GHBUILDTYPE ${BT}" >> githash.h
 
-            mv githash.h fw/${{ matrix.type }}/
+            mv githash.h "fw/${{ matrix.type }}/src/"
+          fi
 
-            sudo snap install arduino-cli
-            arduino-cli core update-index --additional-urls https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json,https://mcudude.github.io/MightyCore/package_MCUdude_MightyCore_index.json > /dev/null
-            arduino-cli core install MightyCore:avr --additional-urls https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json,https://mcudude.github.io/MightyCore/package_MCUdude_MightyCore_index.json > /dev/null
-            
-            PLATFORM=MightyCore:avr
-            arduino-cli compile --verbose --warnings all --fqbn MightyCore:avr:1284:BOD=disabled,LTO=Os,${{ matrix.fqbn }},variant=modelP --build-property compiler.cpp.extra_flags="-DCHANNELS=${{ matrix.channels }}" --build-path fw/${{ matrix.type }}/build/  fw/${{ matrix.type }}
+          python3 -m pip install --upgrade pip
+          python3 -m pip install platformio
 
-            cd fw/${{ matrix.type }}/build/
-            find -type f -name "*.hex" -exec bash -c 'mv $0 fw_${{ matrix.type }}_${{ matrix.name }}.'"${NEXTBUILD}-${BT}"'$(echo $0|sed -e "s/\.\///1"|sed -e "s/${{ matrix.type }}\.ino//g")' {} \;
-            cd ../../..
+          PROJECT_DIR="fw/${{ matrix.type }}"
+          BUILD_DIR="${GITHUB_WORKSPACE}/fw/build"
+          PIO_BUILD_DIR="${PROJECT_DIR}/.pio/build/${{ matrix.env }}"
 
-            rm fw/build -r || true
-            mv fw/${{ matrix.type }}/build fw/build
+          python3 -m platformio run -d "${PROJECT_DIR}" -e "${{ matrix.env }}"
 
-            NEXTBUILD=`echo $NEXTBUILD"+1"|bc`
+          rm -rf "${BUILD_DIR}"
+          mkdir -p "${BUILD_DIR}"
+          HEX_PATH="${PIO_BUILD_DIR}/firmware.hex"
+          cp "${HEX_PATH}" "${BUILD_DIR}/fw_${{ matrix.type }}_${{ matrix.name }}.hex"
+
+          if [ "${{ matrix.versioned }}" = "true" ]; then
+            NEXTBUILD=$(echo "$NEXTBUILD+1" | bc)
 
             if [ "$BUILD_TYPE" = "R" ]; then
-              NEXTRELEASE=`echo $NEXTRELEASE"+1"|bc`
+              NEXTRELEASE=$(echo "$NEXTRELEASE+1" | bc)
             fi
             echo "#this file is maintained by github actions" > nextversion
-            echo "MAJOR ${CURMAJOR}" >> nextversion 
-            echo "MINOR ${CURMINOR}" >> nextversion 
-            echo "RELEASE ${NEXTRELEASE}" >> nextversion 
-            echo "BUILD ${NEXTBUILD}" >> nextversion 
+            echo "MAJOR ${CURMAJOR}" >> nextversion
+            echo "MINOR ${CURMINOR}" >> nextversion
+            echo "RELEASE ${NEXTRELEASE}" >> nextversion
+            echo "BUILD ${NEXTBUILD}" >> nextversion
 
             echo "// This file is overwritten by github actions, do not update it manually" > githash.h
             echo "String githash = \"${{ github.sha }},User\";" >> githash.h
             echo "#define GHRELEASE ${NEXTRELEASE}" >> githash.h
             echo "#define GHBUILD 0" >> githash.h
             echo "#define GHBUILDTYPE User" >> githash.h
-      
-            mv nextversion fw/${{ matrix.type }}/
-            mv githash.h fw/${{ matrix.type }}/
-            touch root
 
-        - name: Store data
-          uses: actions/upload-artifact@v4
-          with:
-            name: fw_${{ matrix.type }}_${{ matrix.name }}
-            path: |
-              fw/build/*.hex
-              fw/${{ matrix.type }}/nextversion
-              fw/${{ matrix.type }}/githash.h
-              root
-            retention-days: 1
+            mv nextversion "fw/${{ matrix.type }}/"
+            mv githash.h "fw/${{ matrix.type }}/src/"
+          fi
+          touch root
+
+      - name: Store data
+        uses: actions/upload-artifact@v4
+        with:
+          name: fw_${{ matrix.type }}_${{ matrix.name }}
+          path: |
+            fw/build/fw_${{ matrix.type }}_${{ matrix.name }}.hex
+            fw/${{ matrix.type }}/nextversion
+            fw/${{ matrix.type }}/src/githash.h
+            root
+          retention-days: 1
 
   commit:
-    if: github.event_name != 'release' #&& github.event.action == 'created'
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     needs: [build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        continue-on-error: true
         with:
-          submodules: True
+          token: ${{ secrets.pat }}
 
       - run: |
-          rm fw/build -r || true
-          mkdir fw/build
-          mkdir fw/artifacts
+          rm -rf fw/build || true
+          mkdir -p fw/build
+          mkdir -p fw/artifacts
 
       - name: Download a Build Artifact
         uses: actions/download-artifact@v4
         with:
           path: 'fw/artifacts/'
-
 
       - name: Update git hash
         run: |
@@ -145,19 +172,18 @@ jobs:
 
           rm -rf fw/artifacts
           rm -rf root
-                          
+
           git status
 
       - name: Get last commit message
         id: last-commit-message
         run: |
           echo "msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
-          
+
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: ${{ steps.last-commit-message.outputs.msg }}, extended build
-          file_pattern: 'fw/build/* fw/UAVDOS/githash.h fw/UAVDOS/nextversion'
+          file_pattern: 'fw/build/* fw/TFUNIPAYLOAD/src/githash.h fw/TFUNIPAYLOAD/nextversion fw/TFUNIPAYLOAD_MINIMAL/src/githash.h fw/TFUNIPAYLOAD_MINIMAL/nextversion'
           #commit_options: '--amend --no-edit'
           #push_options: '--force'
           skip_fetch: true
-

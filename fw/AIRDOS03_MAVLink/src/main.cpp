@@ -1,3 +1,4 @@
+#include <Arduino.h>
 String FWversion = "UAV00"; // 8 MHz crystal
 
 #define MAJOR 0

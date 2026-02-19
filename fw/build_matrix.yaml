@@ -1,0 +1,8 @@
+- name: AIRDOS03
+  type: AIRDOS03_MAVLink
+  env: AIRDOS03_MAVLink
+  versioned: "true"
+- name: AIRDOS03
+  type: AIRDOS03_USTDFF
+  env: AIRDOS03_USTDFF
+  versioned: "true"
