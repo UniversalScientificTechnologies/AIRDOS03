@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #define TYPE "AIRDOS04X"
 #define DIGTYPE "BATDATUNIT01B"
 #define ADCTYPE "USTSIPIN03A"
