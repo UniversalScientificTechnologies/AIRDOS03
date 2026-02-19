@@ -1,8 +1,8 @@
 - name: AIRDOS03
   type: AIRDOS03_MAVLink
-  env: AIRDOS03_MAVLink
+  env: TFUNIPAYLOAD01_uart
   versioned: "true"
 - name: AIRDOS03
   type: AIRDOS03_USTDFF
-  env: AIRDOS03_USTDFF
+  env: TFUNIPAYLOAD01_uart
   versioned: "true"
