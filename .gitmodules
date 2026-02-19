@@ -7,3 +7,6 @@
 [submodule "hw/modules/TFUNIPAYLOAD01"]
 	path = hw/modules/TFUNIPAYLOAD01
 	url = git@github.com:ThunderFly-aerospace/TFUNIPAYLOAD01.git
+[submodule "doc/assets"]
+	path = doc/assets
+	url = git@github.com:UniversalScientificTechnologies/USTassets.git
