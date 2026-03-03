@@ -16,17 +16,45 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #include <Wire.h>
 #include <SPI.h>
 
-#define CONV        0    // PB0, ADC CONV signal
-#define DRESET      22   // PC6, ADC CONV command
-#define DSET        23   // PC7, ADC chip enable
+#define CONV        0     // PB0=0, PB1=1, ADC CONV signal
+#define DRESET      18    // PC2, ADC CONV command
+#define DSET        15    // PD7, ADC chip enable
+#define MUX         24    // PA0=24, PA1=25 
 #define LED1        PIN_LED_RED   // red
 #define LED2        PIN_LED_BLUE  // blue
 #define LED3        PIN_LED_GREEN // green
-#define BUZZER      15            // PD7
 #define POWER5V     26   // PA2
 #define POWER3V3    2    // PB2
-#define EXT_I2C_EN  20   // PC4
+#define TP2         20   // PC4
 #define ACONNECT    27   // PA3
+
+/*
+
+                     Mighty 1284p
+                     +---\/---+
+           (D 0) PB0 |        | PA0 (AI 0 / D24)
+           (D 1) PB1 |        | PA1 (AI 1 / D25)
+      INT2 (D 2) PB2 |        | PA2 (AI 2 / D26)
+       PWM (D 3) PB3 |        | PA3 (AI 3 / D27)
+    PWM/SS (D 4) PB4 |        | PA4 (AI 4 / D28)
+      MOSI (D 5) PB5 |        | PA5 (AI 5 / D29)
+  PWM/MISO (D 6) PB6 |        | PA6 (AI 6 / D30)
+   PWM/SCK (D 7) PB7 |        | PA7 (AI 7 / D31)
+                 RST |        | AREF
+                VCC  |        | GND
+                GND  |        | AVCC
+              XTAL2  |        | PC7 (D 23)
+              XTAL1  |        | PC6 (D 22)
+      RX0 (D 8) PD0  |        | PC5 (D 21) TDI
+      TX0 (D 9) PD1  |        | PC4 (D 20) TDO
+RX1/INT0 (D 10) PD2  |        | PC3 (D 19) TMS
+TX1/INT1 (D 11) PD3  |        | PC2 (D 18) TCK
+     PWM (D 12) PD4  |        | PC1 (D 17) SDA
+     PWM (D 13) PD5  |        | PC0 (D 16) SCL
+     PWM (D 14) PD6  |        | PD7 (D 15) PWM
+                     +--------+
+*/
+
 
 uint16_t count = 0;
 uint8_t histogram[CHANNELS];
@@ -122,8 +150,7 @@ void setup()
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
-  pinMode(BUZZER, OUTPUT);
-
+  
   digitalWrite(DSET, HIGH);
   digitalWrite(DRESET, HIGH);
 
@@ -164,13 +191,14 @@ void loop()
   {
     digitalWrite(DRESET, LOW);
     uint16_t adcVal = SPI.transfer16(0x0000);
-    adcVal >>= 6;
+    adcVal >>= 2;
+    //adcVal &= 0x3FF;
     if (adcVal < CHANNELS && histogram[adcVal] < 255) histogram[adcVal]++;
     digitalWrite(DRESET, HIGH);
   }
 
   unsigned long now = millis();
-  if (now - lastDataOutMs >= 10000)
+  if (now - lastDataOutMs >= 3000)
   {
     lastDataOutMs = now;
     digitalWrite(LED2, HIGH);
