@@ -1,0 +1,28 @@
+{
+  "build": {
+    "core": "MightyCore",
+    "extra_flags": "-DARDUINO_AVR_ATmega1284",
+    "f_cpu": "8000000L",
+    "mcu": "atmega1284p",
+    "variant": "standard"
+  },
+  "bootloader": {
+    "file": "optiboot_flash/bootloaders/atmega1284p/optiboot_flash_atmega1284p_UART1_57600_8000000L_BIGBOOT.hex"
+  },
+  "debug": {
+    "simavr_target": "atmega1284p"
+  },
+  "frameworks": [
+    "arduino"
+  ],
+  "name": "BATDATUNIT01C (ATmega1284P, 8 MHz, UART1, Optiboot)",
+  "upload": {
+    "maximum_ram_size": 16384,
+    "maximum_size": 130048,
+    "protocol": "arduino",
+    "require_upload_port": true,
+    "speed": 57600
+  },
+  "url": "https://github.com/MCUdude/MightyCore",
+  "vendor": "UST"
+}
