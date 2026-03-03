@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #define TYPE "AIRDOS03B"
-#define ADCTYPE "USTSIPIN03A"
+#define ADCTYPE "USTSIPIN03C"
 
 #define MAJOR 1
 #define MINOR 2
@@ -19,15 +19,6 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #define CONV        0    // PB0, ADC CONV signal
 #define DRESET      22   // PC6, ADC CONV command
 #define DSET        23   // PC7, ADC chip enable
-#ifndef PIN_LED_RED
-#define PIN_LED_RED   21
-#endif
-#ifndef PIN_LED_BLUE
-#define PIN_LED_BLUE  22
-#endif
-#ifndef PIN_LED_GREEN
-#define PIN_LED_GREEN 23
-#endif
 #define LED1        PIN_LED_RED   // red
 #define LED2        PIN_LED_BLUE  // blue
 #define LED3        PIN_LED_GREEN // green
