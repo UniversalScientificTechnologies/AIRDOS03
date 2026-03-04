@@ -150,10 +150,12 @@ void setup()
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
+  pinMode(MUX, OUTPUT);
   
   digitalWrite(DSET, HIGH);
   digitalWrite(DRESET, HIGH);
-
+  pinMode(MUX, LOW);
+  
   Serial.println("#Cvak...");
 
   String dataString = "$DOS," TYPE "," + FWversion + ",0," + githash + ",";
@@ -191,10 +193,12 @@ void loop()
   {
     digitalWrite(DRESET, LOW);
     uint16_t adcVal = SPI.transfer16(0x0000);
-    adcVal >>= 2;
+    adcVal >>= 6;
     //adcVal &= 0x3FF;
     if (adcVal < CHANNELS && histogram[adcVal] < 255) histogram[adcVal]++;
     digitalWrite(DRESET, HIGH);
+    //Serial.print("*");
+    //Serial.print(adcVal);
   }
 
   unsigned long now = millis();
