@@ -211,25 +211,7 @@ void loop()
 {
   uint16_t adcVal; 
 
-  digitalWrite(MUX0, HIGH);
-  digitalWrite(MUX1, LOW);
-  digitalWrite(DSET, HIGH);
-  digitalWrite(DRESET, HIGH);
-
-  while(true)
-  {
-    //while ((PINB & 0x10) == 0);
-    if ((PINB & 0x10)==0x10)
-    {
-      delayMicroseconds(20);
-      digitalWrite(DRESET, LOW);
-      digitalWrite(DRESET, HIGH);
-
-    }
-
-  }
-
-  while ((PINB & 0x11) == 0);
+  while ((PINB & 0b11) == 0);
   {
     digitalWrite(MUX0, LOW);
     digitalWrite(MUX1, HIGH);
