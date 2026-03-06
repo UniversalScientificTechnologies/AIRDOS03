@@ -210,36 +210,90 @@ void setup()
 void loop()
 {
   uint16_t adcVal; 
-
+while (true)
+{
   while ((PINB & 0b11) == 0);
   {
-    digitalWrite(MUX0, LOW);
-    digitalWrite(MUX1, HIGH);
-    //digitalWrite(DSET, HIGH);
+    uint8_t COINCIDENCE = PINB & 0b11;
+
+    PORTA = (PORTA & ~0b11) | 0b10; // MUX0=0, MUX1=1
+    PORTD=0b01111111; // #DSET=0
+    PORTD=0b11111111; // #DSET=1
+
     //digitalWrite(DRESET, LOW);
-    PORTC=0b00011011;
-    delayMicroseconds(5);
-    adcVal = SPI.transfer16(0x0000);
-    adcVal >>= 4;
-    adcVal &= 0x3FF;
-    if (histogram0[adcVal] < 255) histogram0[adcVal]++;
-    //delayMicroseconds(100);
-    //digitalWrite(DRESET, HIGH);
-    PORTC=0b00011111;
-    //Serial.print("*");
-    //Serial.print(adcVal);
+    delayMicroseconds(3); 
+    PORTC=0b00011011; // #DRESET=0
+    uint16_t adcVal0 = SPI.transfer16(0x0000);
+    //adcVal = adcVal0 >> 4;
+    //adcVal &= 0x3FF;
+    //if (histogram0[adcVal] < 255) histogram0[adcVal]++;
+    PORTC=0b00011111; // #DRESET=1
 
-    digitalWrite(MUX0, HIGH);
-    digitalWrite(MUX1, LOW);
-    PORTC=0b00011011;
-    delayMicroseconds(5);
-    adcVal = SPI.transfer16(0x0000);
-    adcVal >>= 4;
-    adcVal &= 0x3FF;
-    if (histogram1[adcVal] < 255) histogram1[adcVal]++;
-    PORTC=0b00011111;
+    PORTA = (PORTA & ~0b11) | 0b01; // MUX0=1, MUX1=0
+    PORTD=0b01111111; // #DSET=0
+    PORTD=0b11111111; // #DSET=1
+
+    delayMicroseconds(3);
+    PORTC=0b00011011; // #DRESET=0
+    uint16_t adcVal1 = SPI.transfer16(0x0000);
+    //adcVal = adcVal1 >> 4;
+    //adcVal &= 0x3FF;
+    //if (histogram1[adcVal] < 255) histogram1[adcVal]++;
+    PORTC=0b00011111; // #DRESET=1
+
+    PORTA = (PORTA & ~0b11) | 0b10; // MUX0=0, MUX1=1
+    PORTD=0b01111111; // #DSET=0
+    PORTD=0b11111111; // #DSET=1
+
+    //digitalWrite(DRESET, LOW);
+    delayMicroseconds(3); 
+    PORTC=0b00011011; // #DRESET=0
+    uint16_t adcVal0b = SPI.transfer16(0x0000);
+    //adcVal = adcVal0b >> 4;
+    //adcVal &= 0x3FF;
+    //if (histogram0[adcVal] < 255) histogram0[adcVal]++;
+    PORTC=0b00011111; // #DRESET=1
+
+    PORTA = (PORTA & ~0b11) | 0b01; // MUX0=1, MUX1=0
+    PORTD=0b01111111; // #DSET=0
+    PORTD=0b11111111; // #DSET=1
+
+    delayMicroseconds(3);
+    PORTC=0b00011011; // #DRESET=0
+    uint16_t adcVal1b = SPI.transfer16(0x0000);
+    //adcVal = adcVal1b >> 4;
+    //adcVal &= 0x3FF;
+    //if (histogram1[adcVal] < 255) histogram1[adcVal]++;
+    PORTC=0b00011111; // #DRESET=1
+
+    if (adcVal0 >100 || adcVal1 > 100)
+    if (adcVal0 > adcVal0b)
+    if (adcVal1 > adcVal1b)
+    {
+      digitalWrite(LED1, HIGH);
+      Serial.print("$C,");
+      Serial.print(COINCIDENCE);
+      Serial.print(",");
+      Serial.print(adcVal0);
+      Serial.print(",");
+      Serial.print(adcVal0b);
+      Serial.print(",");
+      Serial.print(adcVal1);
+      Serial.print(",");
+      Serial.print(adcVal1b);
+      Serial.println();
+    }
+    else
+    {
+      digitalWrite(LED1, LOW);
+    }
+
+    PORTA = (PORTA & ~0b11) | 0b00; // MUX0=0, MUX1=0
+    PORTC=0b00011011; // #DRESET=0
+    PORTC=0b00011111; // #DRESET=1
+
   }
-
+}
   unsigned long now = millis();
   if (now - lastDataOutMs >= 3000)
   {
