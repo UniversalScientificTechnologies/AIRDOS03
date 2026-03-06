@@ -16,15 +16,19 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #include <Wire.h>
 #include <SPI.h>
 
-#define CONV        0     // PB0=0, PB1=1, ADC CONV signal
+// PC0=SCL PC1=SDA 
+#define CONV0        0     // PB0=0, ADC CONV signal
+#define CONV1        1     // PB1=1, ADC CONV signal
 #define DRESET      18    // PC2, ADC CONV command
 #define DSET        15    // PD7, ADC chip enable
-#define MUX         24    // PA0=24, PA1=25 
-#define LED1        PIN_LED_RED   // red
-#define LED2        PIN_LED_BLUE  // blue
-#define LED3        PIN_LED_GREEN // green
+#define MUX0        24    // PA0=24 
+#define MUX1        25    // PA1=25 
+#define LED1        PIN_LED_RED   // red PC5
+#define LED2        PIN_LED_BLUE  // blue PC6
+#define LED3        PIN_LED_GREEN // green PC7
 #define POWER5V     26   // PA2
 #define POWER3V3    2    // PB2
+#define TP1         20   // PC3
 #define TP2         20   // PC4
 #define ACONNECT    27   // PA3
 
@@ -57,7 +61,8 @@ TX1/INT1 (D 11) PD3  |        | PC2 (D 18) TCK
 
 
 uint16_t count = 0;
-uint8_t histogram[CHANNELS];
+uint8_t histogram0[CHANNELS];
+uint8_t histogram1[CHANNELS];
 uint8_t ADCconf1;
 uint8_t ADCconf2;
 
@@ -113,23 +118,23 @@ void StatusOut()
 
 void DataOut()
 {
-  uint16_t noise = 4;
-  uint32_t flux = 0;
-
-  for (uint16_t n = noise; n < CHANNELS; n++)
-  {
-    flux += histogram[n];
-  }
-
-  Serial.print("$HIST,");
+  Serial.print("$HIST0,");
   Serial.print(count);
-  Serial.print(",");
-  Serial.print(flux);
 
   for (uint16_t n = 0; n < CHANNELS; n++)
   {
     Serial.print(",");
-    Serial.print(histogram[n]);
+    Serial.print(histogram0[n]);
+  }
+  Serial.println();
+
+  Serial.print("$HIST1,");
+  Serial.print(count);
+
+  for (uint16_t n = 0; n < CHANNELS; n++)
+  {
+    Serial.print(",");
+    Serial.print(histogram1[n]);
   }
   Serial.println();
 
@@ -141,20 +146,23 @@ void setup()
   Serial.begin(115200);
   Wire.setClock(100000);
   SPI.begin();
-  SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
+  SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
 
   pinMode(ACONNECT, INPUT);
-  pinMode(CONV, INPUT);
+  pinMode(CONV0, INPUT);
+  pinMode(CONV1, INPUT);
   pinMode(DRESET, OUTPUT);
   pinMode(DSET, OUTPUT);
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
-  pinMode(MUX, OUTPUT);
+  pinMode(MUX0, OUTPUT);
+  pinMode(MUX1, OUTPUT);
   
   digitalWrite(DSET, HIGH);
   digitalWrite(DRESET, HIGH);
-  pinMode(MUX, LOW);
+  digitalWrite(MUX0, HIGH);
+  digitalWrite(MUX1, HIGH);
   
   Serial.println("#Cvak...");
 
@@ -181,24 +189,73 @@ void setup()
   digitalWrite(LED1, LOW);
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
+  digitalWrite(LED1, HIGH);
+  delay(500);
+  digitalWrite(LED2, HIGH);
+  delay(500);
+  digitalWrite(LED3, HIGH);
+  delay(500);
+  digitalWrite(LED1, LOW);
+  delay(500);
+  digitalWrite(LED2, LOW);
+  delay(500);
+  digitalWrite(LED3, LOW);
 
-  memset(histogram, 0, sizeof(histogram));
+  memset(histogram0, 0, sizeof(histogram0));
+  memset(histogram1, 0, sizeof(histogram1));
   lastDataOutMs = millis();
   lastStatusMs = millis();
 }
 
 void loop()
 {
-  if ((PINB & 1) != 0)
+  uint16_t adcVal; 
+
+  digitalWrite(MUX0, HIGH);
+  digitalWrite(MUX1, LOW);
+  digitalWrite(DSET, HIGH);
+  digitalWrite(DRESET, HIGH);
+
+  while(true)
   {
-    digitalWrite(DRESET, LOW);
-    uint16_t adcVal = SPI.transfer16(0x0000);
-    adcVal >>= 6;
-    //adcVal &= 0x3FF;
-    if (adcVal < CHANNELS && histogram[adcVal] < 255) histogram[adcVal]++;
-    digitalWrite(DRESET, HIGH);
+    //while ((PINB & 0x10) == 0);
+    if ((PINB & 0x10)==0x10)
+    {
+      delayMicroseconds(20);
+      digitalWrite(DRESET, LOW);
+      digitalWrite(DRESET, HIGH);
+
+    }
+
+  }
+
+  while ((PINB & 0x11) == 0);
+  {
+    digitalWrite(MUX0, LOW);
+    digitalWrite(MUX1, HIGH);
+    //digitalWrite(DSET, HIGH);
+    //digitalWrite(DRESET, LOW);
+    PORTC=0b00011011;
+    delayMicroseconds(5);
+    adcVal = SPI.transfer16(0x0000);
+    adcVal >>= 4;
+    adcVal &= 0x3FF;
+    if (histogram0[adcVal] < 255) histogram0[adcVal]++;
+    //delayMicroseconds(100);
+    //digitalWrite(DRESET, HIGH);
+    PORTC=0b00011111;
     //Serial.print("*");
     //Serial.print(adcVal);
+
+    digitalWrite(MUX0, HIGH);
+    digitalWrite(MUX1, LOW);
+    PORTC=0b00011011;
+    delayMicroseconds(5);
+    adcVal = SPI.transfer16(0x0000);
+    adcVal >>= 4;
+    adcVal &= 0x3FF;
+    if (histogram1[adcVal] < 255) histogram1[adcVal]++;
+    PORTC=0b00011111;
   }
 
   unsigned long now = millis();
@@ -207,7 +264,8 @@ void loop()
     lastDataOutMs = now;
     digitalWrite(LED2, HIGH);
     DataOut();
-    memset(histogram, 0, sizeof(histogram));
+    memset(histogram0, 0, sizeof(histogram0));
+    memset(histogram1, 0, sizeof(histogram1));
 
     digitalWrite(DSET, HIGH);
     digitalWrite(DRESET, LOW);
@@ -216,9 +274,11 @@ void loop()
     digitalWrite(LED2, LOW);
   }
 
+  /*
   if (now - lastStatusMs >= 60000)
   {
     lastStatusMs = now;
     StatusOut();
   }
+  */
 }
