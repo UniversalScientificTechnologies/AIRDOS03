@@ -19,14 +19,9 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #define CONV        0     // PB0=0, PB1=1, ADC CONV signal
 #define DRESET      18    // PC2, ADC CONV command
 #define DSET        15    // PD7, ADC chip enable
-#define MUX         24    // PA0=24, PA1=25 
 #define LED1        PIN_LED_RED   // red
 #define LED2        PIN_LED_BLUE  // blue
 #define LED3        PIN_LED_GREEN // green
-#define POWER5V     26   // PA2
-#define POWER3V3    2    // PB2
-#define TP2         20   // PC4
-#define ACONNECT    27   // PA3
 
 /*
 
@@ -143,7 +138,6 @@ void setup()
   SPI.begin();
   SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
 
-  pinMode(ACONNECT, INPUT);
   pinMode(CONV, INPUT);
   pinMode(DRESET, OUTPUT);
   pinMode(DSET, OUTPUT);

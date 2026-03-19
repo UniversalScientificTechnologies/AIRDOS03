@@ -10,12 +10,13 @@ String FWversion = "UAV00"; // 8 MHz crystal
 #include "githash.h"
 #include "mavlink/common/mavlink.h"
 
-#define CONV        0    // PB0, ADC CONV signal
-#define DRESET      22   // PC6, peak detector reset / ADC CONV
-#define DSET        23   // PC7, ADC chip enable
-#define LED1        12   // PD4
-#define LED2        13   // PD5
-#define LED3        14   // PD6
+#define CONV        0     // PB0=0, PB1=1, ADC CONV signal
+#define DRESET      18    // PC2, ADC CONV command
+#define DSET        15    // PD7, ADC chip enable
+#define LED1        PIN_LED_RED   // red
+#define LED2        PIN_LED_BLUE  // blue
+#define LED3        PIN_LED_GREEN // green
+
 
 #define CHANNELS 1024
 #define HIST_OUT_START 4
