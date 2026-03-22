@@ -3,7 +3,7 @@
 #define ADCTYPE "USTSIPIN03C"
 
 #define MAJOR 1
-#define MINOR 2
+#define MINOR 3
 #include "githash.h"
 
 #define XSTR(s) STR(s)
@@ -11,13 +11,18 @@
 
 String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-"XSTR(GHBUILDTYPE);
 
-#define CHANNELS 1024
+// Channels below this threshold go to histogram; at or above are logged as $E events
+#define THRESHOLD   64
+// Total ADC range (10-bit after >>2 from 12-bit SPI word)
+#define CHANNELS    1024
+// Maximum number of above-threshold events stored per integration
+#define MAX_EVENTS  300
 
 #include <Wire.h>
 #include <SPI.h>
 
-#define CONV        0     // PB0=0, PB1=1, ADC CONV signal
-#define DRESET      18    // PC2, ADC CONV command
+#define CONV        0     // PB0, ADC CONV signal — uses PCINT0
+#define DRESET      18    // PC2, ADC peak-detector reset
 #define DSET        15    // PD7, ADC chip enable
 #define LED1        PIN_LED_RED   // red
 #define LED2        PIN_LED_BLUE  // blue
@@ -50,14 +55,64 @@ TX1/INT1 (D 11) PD3  |        | PC2 (D 18) TCK
                      +--------+
 */
 
-
 uint16_t count = 0;
-uint8_t histogram[CHANNELS];
+uint16_t histogram[THRESHOLD];   // counts for ADC values 0 .. THRESHOLD-1
+
+volatile uint16_t event_time[MAX_EVENTS];
+volatile uint16_t event_channel[MAX_EVENTS];
+volatile uint16_t events_counter = 0;
+
 uint8_t ADCconf1;
 uint8_t ADCconf2;
 
+volatile uint16_t startSystime = 0;
+
 unsigned long lastDataOutMs = 0;
 unsigned long lastStatusMs = 0;
+
+// ---------------------------------------------------------------------------
+// Pin Change Interrupt on PB0 (PCINT0) — fires on every edge of CONV
+// Rising edge: CONV went HIGH → ADC conversion ready
+// ---------------------------------------------------------------------------
+ISR(PCINT0_vect)
+{
+  if (!(PINB & (1 << 0))) return; // ignore falling edge
+
+  uint16_t timestamp = TCNT1;
+
+  // Assert DRESET (PC2) LOW to latch the ADC output
+  PORTC &= ~(1 << 2);
+
+  // Raw SPI transfer (SPI already configured in setup)
+  SPDR = 0x00;
+  while (!(SPSR & (1 << SPIF)));
+  uint8_t hi = SPDR;
+  SPDR = 0x00;
+  while (!(SPSR & (1 << SPIF)));
+  uint8_t lo = SPDR;
+
+  // Release DRESET HIGH
+  PORTC |= (1 << 2);
+
+  uint16_t adcVal = ((uint16_t)hi << 8) | lo;
+  adcVal >>= 2; // 12-bit SPI word → 10-bit ADC value
+
+  if (adcVal < THRESHOLD)
+  {
+    if (histogram[adcVal] < 65535) histogram[adcVal]++;
+  }
+  else
+  {
+    if (events_counter < MAX_EVENTS)
+    {
+      event_time[events_counter]    = timestamp;
+      event_channel[events_counter] = adcVal;
+    }
+    events_counter++;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 void printHexSN(uint8_t eepromAddr)
 {
@@ -76,7 +131,7 @@ void printHexSN(uint8_t eepromAddr)
 
 void printOptionalEnv()
 {
-  // Optional humidity/temperature readout from SHT4x on external I2C (0x44)
+  // Humidity/temperature from SHT4x on external I2C (0x44)
   Wire.beginTransmission(0x44);
   Wire.write((uint8_t)0xFD); // high precision measurement
   if (Wire.endTransmission() == 0)
@@ -94,9 +149,11 @@ void printOptionalEnv()
       float humidity = -6.0f + 125.0f * ((float)rh_raw / 65535.0f);
 
       Serial.print("$ENV,");
-      Serial.print(tempC, 2);
+      Serial.print(count);
+      Serial.print(",0.0,");
+      Serial.print(tempC, 1);
       Serial.print(",");
-      Serial.println(humidity, 2);
+      Serial.println(humidity, 1);
     }
   }
 }
@@ -108,20 +165,37 @@ void StatusOut()
 
 void DataOut()
 {
-  uint16_t noise = 4;
-  uint32_t flux = 0;
+  // Snapshot volatile counters with interrupts disabled
+  cli();
+  uint16_t stopSystime    = TCNT1;
+  uint16_t evCount        = events_counter;
+  uint16_t captStart      = startSystime;
+  sei();
 
-  for (uint16_t n = noise; n < CHANNELS; n++)
-  {
-    flux += histogram[n];
-  }
-
-  Serial.print("$HIST,");
+  // $START — beginning of integration window
+  Serial.print("$START,");
   Serial.print(count);
   Serial.print(",");
-  Serial.print(flux);
+  Serial.println(captStart);
 
-  for (uint16_t n = 0; n < CHANNELS; n++)
+  // $E — individual above-threshold events
+  for (uint16_t n = 0; n < evCount && n < MAX_EVENTS; n++)
+  {
+    Serial.print("\r\n$E,");
+    Serial.print(event_time[n]);
+    Serial.print(",");
+    Serial.print(event_channel[n]);
+  }
+
+  // $STOP — end of integration window with histogram
+  Serial.print("\r\n$STOP,");
+  Serial.print(count);
+  Serial.print(",0.0,");
+  Serial.print(stopSystime);
+  Serial.print(",");
+  Serial.print(evCount);
+
+  for (uint16_t n = 0; n < THRESHOLD; n++)
   {
     Serial.print(",");
     Serial.print(histogram[n]);
@@ -135,27 +209,38 @@ void setup()
 {
   Serial.begin(115200);
   Wire.setClock(100000);
+
+  // SPI: 500 kHz, MSB first, mode 0
   SPI.begin();
   SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
 
-  pinMode(CONV, INPUT);
+  // Timer1: normal mode, prescaler 1024 → 128 µs/tick at 8 MHz
+  TCCR1A = 0;
+  TCCR1B = (1 << CS12) | (1 << CS10);
+  TCNT1  = 0;
+
+  pinMode(CONV,   INPUT);
   pinMode(DRESET, OUTPUT);
-  pinMode(DSET, OUTPUT);
-  pinMode(LED1, OUTPUT);
-  pinMode(LED2, OUTPUT);
-  pinMode(LED3, OUTPUT);
-  
-  digitalWrite(DSET, HIGH);
+  pinMode(DSET,   OUTPUT);
+  pinMode(LED1,   OUTPUT);
+  pinMode(LED2,   OUTPUT);
+  pinMode(LED3,   OUTPUT);
+
+  digitalWrite(DSET,   HIGH);
   digitalWrite(DRESET, HIGH);
+
+  // Enable Pin Change Interrupt on PB0 (PCINT0) for CONV signal
+  PCICR  |= (1 << PCIE0);  // enable PCINT for port B
+  PCMSK0 |= (1 << PCINT0); // enable PCINT0 (PB0)
 
   Serial.println("#Cvak...");
 
   String dataString = "$DOS," TYPE "," + FWversion + ",0," + githash + ",";
   Serial.print(dataString);
-  printHexSN(0x5B); // analog board SN
+  printHexSN(0x5B);
+  Serial.println();
 
-
-  Serial.print("\r\n$ADC," ADCTYPE ",");
+  Serial.print("$ADC," ADCTYPE ",");
   printHexSN(0x5B);
   Serial.print(",");
   Wire.beginTransmission(0x53);
@@ -174,39 +259,46 @@ void setup()
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
 
-  memset(histogram, 0, sizeof(histogram));
+  memset(histogram,    0, sizeof(histogram));
+  memset((void*)event_time,    0, sizeof(event_time));
+  memset((void*)event_channel, 0, sizeof(event_channel));
+  events_counter = 0;
+
   lastDataOutMs = millis();
-  lastStatusMs = millis();
+  lastStatusMs  = millis();
+  startSystime  = TCNT1;
 }
 
 void loop()
 {
-  if ((PINB & 1) != 0)
-  {
-    digitalWrite(DRESET, LOW);
-    uint16_t adcVal = SPI.transfer16(0x0000);
-    adcVal >>= 2;
-    //adcVal &= 0x3FF;
-    if (adcVal < CHANNELS && histogram[adcVal] < 255) histogram[adcVal]++;
-    digitalWrite(DRESET, HIGH);
-  }
-
   unsigned long now = millis();
+
   if (now - lastDataOutMs >= 3000)
   {
     lastDataOutMs = now;
     digitalWrite(LED2, HIGH);
-    DataOut();
-    memset(histogram, 0, sizeof(histogram));
 
-    digitalWrite(DSET, HIGH);
+    DataOut();
+
+    // Reset buffers for next integration window
+    cli();
+    memset(histogram,    0, sizeof(histogram));
+    memset((void*)event_time,    0, sizeof(event_time));
+    memset((void*)event_channel, 0, sizeof(event_channel));
+    events_counter = 0;
+    startSystime   = TCNT1;
+    sei();
+
+    // Pulse DSET/DRESET to re-arm peak detector
+    digitalWrite(DSET,   HIGH);
     digitalWrite(DRESET, LOW);
     SPI.transfer16(0x0000);
     digitalWrite(DRESET, HIGH);
+
     digitalWrite(LED2, LOW);
   }
 
-  if (now - lastStatusMs >= 60000)
+  if (now - lastStatusMs >= 300000)
   {
     lastStatusMs = now;
     StatusOut();
