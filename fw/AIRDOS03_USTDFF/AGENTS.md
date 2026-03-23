@@ -19,9 +19,9 @@ work on this project without losing history across sessions.
 ### Pin mapping
 | AVR pin | Arduino | Function |
 |---------|---------|----------|
-| PB0 | D0 | ADC CONV signal — PCINT0 (PCINT0_vect) |
+| PB0 | D0 | ADC CONV signal — PCINT8 (PCINT1_vect, PCMSK1 bit 0) |
 | PC2 | D18 | DRESET — peak-detector reset (active LOW) |
-| PD4 | D12 | GNSS 1PPS — PCINT12 (PCINT1_vect) |
+| PD4 | D12 | GNSS 1PPS — PCINT28 (PCINT3_vect, PCMSK3 bit 4) |
 | PD7 | D15 | DSET — ADC chip enable |
 | PC1 | D17 | SDA (I2C) |
 | PC0 | D16 | SCL (I2C) |
@@ -114,12 +114,20 @@ existing AIRDOS04 parsers recognise this as an unsynced state).
 | Vector | Pin | Trigger | Action |
 |--------|-----|---------|--------|
 | `PCINT0_vect` | PB0 (CONV) | Rising edge | Read ADC via raw SPI (SPDR), classify into histogram or event buffer |
-| `PCINT1_vect` | PD4 (1PPS) | Rising/falling edge | Rising: increment `rtc_seconds`, capture `last_pps_tcnt1`, LED3 ON (PC7); Falling: LED3 OFF |
+| loop() polling | PD4 (1PPS) | Rising/falling edge | Rising: increment `rtc_seconds`, capture `last_pps_tcnt1`, LED3 ON (PC7); Falling: LED3 OFF |
+
+**ATmega1284P PCINT port mapping** (differs from most AVRs):
+| Port | PCINT range | PCMSK | PCIE | Vector |
+|------|-------------|-------|------|--------|
+| PA | PCINT0–7   | PCMSK0 | PCIE0 | PCINT0_vect |
+| PB | PCINT8–15  | PCMSK1 | PCIE1 | PCINT1_vect |
+| PC | PCINT16–23 | PCMSK2 | PCIE2 | PCINT2_vect |
+| PD | PCINT24–31 | PCMSK3 | PCIE3 | PCINT3_vect |
 
 Enable registers:
 ```cpp
-PCICR  |= (1 << PCIE0);  PCMSK0 |= (1 << 0);  // PB0 = PCINT0
-PCICR  |= (1 << PCIE1);  PCMSK1 |= (1 << 4);  // PD4 = PCINT12, bit 4 of PCMSK1
+PCICR  |= (1 << PCIE1);  PCMSK1 |= (1 << 0);  // PB0 = PCINT8, bit 0 of PCMSK1
+PCICR  |= (1 << PCIE3);  PCMSK3 |= (1 << 4);  // PD4 = PCINT28, bit 4 of PCMSK3
 ```
 
 ## Differences from OUTPUT_FORMAT.md (AIRDOS04C)

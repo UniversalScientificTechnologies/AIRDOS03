@@ -87,10 +87,10 @@ char    nmea_buf[100];
 uint8_t nmea_len = 0;
 
 // ===========================================================================
-// ISR: GNSS 1PPS on PD4 (PCINT12 → PCINT1_vect)
+// ISR: GNSS 1PPS on PD4 (PCINT28 → PCINT3_vect)
 // Rising edge: start of a new UTC second.
 // ===========================================================================
-ISR(PCINT1_vect)
+ISR(PCINT3_vect)
 {
   if (PIND & (1 << 4))              // rising edge — start of UTC second
   {
@@ -105,10 +105,10 @@ ISR(PCINT1_vect)
 }
 
 // ===========================================================================
-// ISR: ADC CONV on PB0 (PCINT0 → PCINT0_vect)
+// ISR: ADC CONV on PB0 (PCINT8 → PCINT1_vect)
 // Rising edge: ADC conversion ready — read value via raw SPI.
 // ===========================================================================
-ISR(PCINT0_vect)
+ISR(PCINT1_vect)
 {
   if (!(PINB & (1 << 0))) return;   // ignore falling edge
 
@@ -492,13 +492,13 @@ void setup()
   digitalWrite(DSET,   HIGH);
   digitalWrite(DRESET, HIGH);
 
-  // PCINT0: PB0 (CONV) — ADC event capture
-  PCICR  |= (1 << PCIE0);
-  PCMSK0 |= (1 << 0);      // PB0 = PCINT0
-
-  // PCINT1: PD4 (1PPS) — GNSS seconds tick
+  // PCINT1: PB0 (CONV) — ADC event capture  (PB0 = PCINT8, bit 0 of PCMSK1)
   PCICR  |= (1 << PCIE1);
-  PCMSK1 |= (1 << 4);      // PD4 = PCINT12, bit 4 within PCMSK1
+  PCMSK1 |= (1 << 0);
+
+  // PCINT3: PD4 (1PPS) — GNSS seconds tick  (PD4 = PCINT28, bit 4 of PCMSK3)
+  PCICR  |= (1 << PCIE3);
+  PCMSK3 |= (1 << 4);
 
   Serial.println("#Cvak...");
 
