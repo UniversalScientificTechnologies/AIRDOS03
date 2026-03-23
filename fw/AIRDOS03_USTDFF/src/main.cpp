@@ -92,9 +92,16 @@ uint8_t nmea_len = 0;
 // ===========================================================================
 ISR(PCINT1_vect)
 {
-  if (!(PIND & (1 << 4))) return;   // ignore falling edge
-  last_pps_tcnt1 = TCNT1;
-  rtc_seconds++;
+  if (PIND & (1 << 4))              // rising edge — start of UTC second
+  {
+    last_pps_tcnt1 = TCNT1;
+    rtc_seconds++;
+    PORTC |= (1 << 7);             // LED3 ON  (PC7 = PIN_LED_GREEN = D23)
+  }
+  else                              // falling edge — end of 1PPS pulse
+  {
+    PORTC &= ~(1 << 7);            // LED3 OFF
+  }
 }
 
 // ===========================================================================
@@ -464,7 +471,7 @@ void StatusOut()
 void setup()
 {
   Serial.begin(115200);
-  Serial1.begin(9600);      // GNSS NMEA output
+  Serial1.begin(38400);     // GNSS NMEA output
   Wire.setClock(100000);
   SPI.begin();
   SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));

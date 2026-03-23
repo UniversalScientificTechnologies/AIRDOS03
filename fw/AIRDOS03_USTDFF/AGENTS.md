@@ -90,6 +90,7 @@ $TIME,<rtc_seconds>,<gnss_sync_unix>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM
 | Integration interval | 10000 ms | Controlled by `lastDataOutMs` + `millis()` |
 | Timer1 prescaler | 1024 | 128 us / tick at 8 MHz |
 | `MAJOR.MINOR` | 1.3 | First release with new output format |
+| GNSS baud rate | 38400 | Serial1 to GNSS receiver |
 
 ## Time-keeping architecture
 
@@ -113,7 +114,7 @@ existing AIRDOS04 parsers recognise this as an unsynced state).
 | Vector | Pin | Trigger | Action |
 |--------|-----|---------|--------|
 | `PCINT0_vect` | PB0 (CONV) | Rising edge | Read ADC via raw SPI (SPDR), classify into histogram or event buffer |
-| `PCINT1_vect` | PD4 (1PPS) | Rising edge | Increment `rtc_seconds`, capture `last_pps_tcnt1` |
+| `PCINT1_vect` | PD4 (1PPS) | Rising/falling edge | Rising: increment `rtc_seconds`, capture `last_pps_tcnt1`, LED3 ON (PC7); Falling: LED3 OFF |
 
 Enable registers:
 ```cpp
