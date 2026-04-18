@@ -2,15 +2,19 @@
 
 AIRDOS03, also referred to as UAVDOS, is a compact semiconductor-based ionizing radiation dosimeter and spectrometer designed primarily for use on [unmanned aerial vehicles (UAVs)](https://en.wikipedia.org/wiki/Unmanned_aerial_vehicle). The device was developed in cooperation between [Universal Scientific Technologies s.r.o. (UST)](https://www.ust.cz/) and [ThunderFly s.r.o.](https://www.thunderfly.cz/), and is optimized for airborne radiation research missions, environmental monitoring, and atmospheric studies.
 
-AIRDOS03 is an sensor of the [TF-ATMON measurement toolchain](https://docs.thunderfly.cz/instruments/TF-ATMON) and is fully compatible with the Pixhawk ecosystem, enabling straightforward integration with a wide range of UAV avionics.
+![AIRDOS03](/doc/img/AIRDOS03.jpg)
 
-## Key design philosophy
+![AIRDOS03](/doc/img/AIRDOS03_Parallel-shape_interface_board.jpg)
 
-The core idea behind AIRDOS03 integrated in TF-ATMON is to minimize radiation detector payload mass by leveraging resources that are already available on the UAV platform. Power supply, data logging, telemetry infrastructure, and timing or synchronization sources can be shared with onboard avionics. This approach significantly reduces the impact of the radiation sensor on flight endurance and mission range while still enabling high‑quality scientific measurements.
+AIRDOS03 is sensor compatible with the [TF-ATMON measurement toolchain](https://docs.thunderfly.cz/instruments/TF-ATMON) and could be used within the Pixhawk ecosystem, enabling straightforward integration with a wide range of UAV avionics.
+
+## Design considerations
+
+The core idea behind AIRDOS03 integrated in TF-ATMON is to minimize radiation detector payload mass by utilize resources that are already available on the UAV platform. Power supply, data logging, telemetry infrastructure, and timing or synchronization sources can be shared with onboard avionics. This approach significantly reduces the impact of the radiation sensor on flight endurance and mission range while still enabling high‑quality scientific measurements.
 
 ## Core technology
 
-AIRDOS03 is based on the proven UST's silicon PIN diode detection electronics. The system measures deposited energy of ionizing radiation events and provides both dosimetric and spectrometric information over a wide dynamic range.
+AIRDOS03 is based on the proven UST's silicon PIN diode technology. The system measures deposited energy of ionizing radiation events and provides both dosimetric and spectrometric information over a wide dynamic range.
 
 ### Radiation measurement
 
@@ -18,11 +22,11 @@ The detector covers an energy range of approximately 40 keV to 80 MeV with an en
 
 ### Environmental sensing
 
-To support correction of radiation data to local atmospheric conditions, AIRDOS03 includes integrated sensors for temperature and relative humidity. The temperature range spans −40 to +125 °C with an accuracy of approximately ±0.5 °C, relative humidity is measured from 0 to 100 %RH with ±2 %RH accuracy.
+To support correction of radiation data to local atmospheric conditions, AIRDOS03 includes integrated sensors for temperature and relative humidity. The temperature range spans −40 to +80 °C with an accuracy of approximately ±0.5 °C, relative humidity is measured from 0 to 100 %RH with ±2 %RH accuracy.
 
 ## Mechanical and electrical characteristics
 
-AIRDOS03 is housed in a compact, lightweight form factor suitable for airframe integration. The electronics measure approximately 91 × 51 × 20 mm and have a total mass of about 40 g. The device is powered from a 5 V supply and typically draws around 3 mA, making it compatible even with small UAV platforms where power and mass budgets are limited.
+AIRDOS03 has compact, lightweight form factor suitable for airframe integration. The electronics measure approximately 91 × 51 × 20 mm and have a total mass of about 40 g. The device is powered from a 5 V supply and typically draws around 3 mA, making it compatible even with small UAV platforms where power and mass budgets are limited.
 
 ## Interfaces and connectivity
 
@@ -61,7 +65,7 @@ The auxiliary interface is primarily intended for timing and synchronization but
 
 ## UAV integration
 
-AIRDOS03 is designed as a native sensor for the [TF‑ATMON](https://docs.thunderfly.cz/instruments/TF-ATMON) system and has been validated in real airborne deployments, including integration with platforms such as the [ThunderFly TF‑G2 autogyro](https://docs.thunderfly.cz/instruments/TF-G2) or [experimental stratospheric balloon platform TF-B1](https://docs.thunderfly.cz/instruments/TF-B1). In this configuration, the sensor enables three‑dimensional mapping of radiation intensity, supports adaptive flight strategies based on measured intensity, and allows efficient utilization of limited flight time in dynamically changing atmospheric conditions.
+AIRDOS03 is designed as a native sensor for the [TF‑ATMON](https://docs.thunderfly.cz/instruments/TF-ATMON) system and has been validated in real airborne deployments, including integration with platforms such as the [ThunderFly TF‑G2 autogyro](https://docs.thunderfly.cz/instruments/TF-G2) or [experimental stratospheric balloon platform TF-B1](https://docs.thunderfly.cz/instruments/TF-B1). In this configuration, the sensor enables mapping of radiation intensity, supports adaptive flight strategies based on measured intensity, and allows efficient utilization of limited flight time.
 
 ## Typical use cases
 
@@ -69,11 +73,11 @@ Typical applications of AIRDOS03 include UAV‑based atmospheric radiation surve
 
 ## Software and firmware
 
-AIRDOS03 uses modular, open-source firmware that can be adapted for specific scientific missions. Output formats are suitable for post-processing and advanced spectral analysis.
+AIRDOS03 uses modular, open-source firmware that can be adapted for specific scientific missions. Output formats are suitable for post-processing.
 
 ## Availability
 
-AIRDOS03 can be obtained directly via [ThunderFly s.r.o.](https://www.thunderfly.cz/contact-us.html) or [Universal Scientific Technologies s.r.o.](https://www.ust.cz/about/), which provides sales, integration support, and customer assistance for airborne applications. For special configurations or larger quantities, please contact us with your project requirements.
+AIRDOS03 can be obtained both via [ThunderFly s.r.o.](https://www.thunderfly.cz/contact-us.html) or [Universal Scientific Technologies s.r.o.](https://www.ust.cz/about/), which provides sales, integration support, and customer assistance for airborne applications. For special configurations or larger quantities, please contact us with your project requirements.
 
 Further documentation:
 
