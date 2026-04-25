@@ -39,6 +39,17 @@ static void SendTunnelData(uint8_t *data, uint8_t len,
   hs.write(buf, n);
 }
 
+// Broadcast variant: target_system = 0, target_component = 0
+static void SendTunnelBroadcast(uint8_t *data, uint8_t len,
+                                uint8_t payload_type = 4)
+{
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  mavlink_msg_tunnel_pack(1, 10, &msg, 0, 0, payload_type, len, data);
+  uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
+  hs.write(buf, n);
+}
+
 // ---------------------------------------------------------------------------
 // Measurement buffers  (written from ISR)
 // ---------------------------------------------------------------------------
@@ -47,6 +58,10 @@ volatile uint16_t event_time[MAX_EVENTS];
 volatile uint16_t event_channel[MAX_EVENTS];
 volatile uint16_t events_counter = 0;
 volatile uint16_t startSystime   = 0;
+
+// Cumulative diagnostic counters (NOT reset by 10 s cycle)
+volatile uint32_t total_pulses     = 0;  // every CONV interrupt since boot
+volatile uint32_t events_min_count = 0;  // events ≥ THRESHOLD since last ALIVE
 
 // ---------------------------------------------------------------------------
 // Time-keeping
@@ -69,6 +84,7 @@ uint8_t  serial_number[16];
 
 unsigned long lastDataOutMs = 0;
 unsigned long lastStatusMs  = 0;
+unsigned long lastAliveMs   = 0;
 
 char    nmea_buf[100];
 uint8_t nmea_len = 0;
@@ -96,6 +112,8 @@ ISR(PCINT3_vect)
 ISR(PCINT1_vect)
 {
   if (!(PINB & (1 << 0))) return;   // ignore falling edge
+
+  total_pulses++;                    // cumulative since boot (alive heartbeat)
 
   uint16_t timestamp = TCNT1;
 
@@ -125,6 +143,7 @@ ISR(PCINT1_vect)
       event_channel[events_counter] = adcVal;
     }
     events_counter++;
+    events_min_count++;             // counted every event (incl. > MAX_EVENTS)
   }
 }
 
@@ -226,6 +245,31 @@ static void SendENV()
   memcpy(buf +  9, &tempC,    4);
   memcpy(buf + 13, &humidity, 4);
   SendTunnelData(buf, sizeof(buf));
+}
+
+// 0x09 — ALIVE (20 bytes), broadcast every 60 s
+static void SendAlive()
+{
+  cli();
+  uint32_t pulses  = total_pulses;
+  uint32_t evt_min = events_min_count;
+  events_min_count = 0;
+  uint32_t rSec    = rtc_seconds;
+  uint32_t sRtc    = sync_rtc_seconds;
+  sei();
+
+  uint32_t uptime_s = millis() / 1000UL;
+  uint32_t age      = gnss_synced ? (rSec - sRtc) : 0UL;
+
+  uint8_t buf[20];
+  buf[0] = 0x09;
+  memcpy(buf +  1, &uptime_s, 4);
+  memcpy(buf +  5, &count,    2);
+  memcpy(buf +  7, &pulses,   4);
+  memcpy(buf + 11, &evt_min,  4);
+  buf[15] = gnss_synced ? 1 : 0;
+  memcpy(buf + 16, &age,      4);
+  SendTunnelBroadcast(buf, sizeof(buf));
 }
 
 // ===========================================================================
@@ -502,6 +546,7 @@ void setup()
 
   lastDataOutMs = millis();
   lastStatusMs  = millis();
+  lastAliveMs   = millis();
   startSystime  = TCNT1;
 }
 
@@ -543,5 +588,11 @@ void loop()
   {
     lastStatusMs = now;
     SendENV();
+  }
+
+  if (now - lastAliveMs >= 60000UL)
+  {
+    lastAliveMs = now;
+    SendAlive();
   }
 }

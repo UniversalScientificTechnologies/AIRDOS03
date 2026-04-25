@@ -48,6 +48,7 @@ All multi-byte integers are **little-endian**.
 | 0x06   | AIRDOS_HIST_HI  | histogram[32..63] | 67 B         |
 | 0x07   | AIRDOS_EVENTS   | `$E` events       | ≤121 B       |
 | 0x08   | AIRDOS_ENV      | `$ENV`            | 17 B         |
+| 0x09   | AIRDOS_ALIVE    | heartbeat (broadcast) | 20 B     |
 
 ---
 
@@ -186,6 +187,36 @@ Python: `struct.unpack_from('<BHIBxff', payload)`
 
 ---
 
+### 0x09 — ALIVE (20 bytes, broadcast)
+
+Heartbeat sent once per minute as MAVLink **broadcast** (`target_system = 0`,
+`target_component = 0`). Lets any listener confirm the unit is alive and roughly
+how much it is seeing, without waiting for the 10 s measurement cycle.
+
+```
+Offset  Size  Field
+  0      1    sub_type        = 0x09
+  1      4    uptime_s        // millis() / 1000
+  5      2    count           // current cycle index
+  7      4    cum_pulses      // cumulative ADC interrupts since boot
+                              //   (events + every histogram increment)
+ 11      4    events_min      // events ≥ THRESHOLD since last ALIVE
+                              //   (counted always, incl. when MAX_EVENTS exceeded)
+ 15      1    gnss_synced     // 1 = valid GNSS fix at least once
+ 16      4    sync_age        // seconds since last GNSS fix (0 if never synced)
+```
+
+Python: `struct.unpack_from('<BIHIIBxxxI', payload)` — note 3 padding bytes
+are not present in the wire format; use explicit slicing instead:
+
+```python
+sub, uptime, count, cum_pulses, events_min = struct.unpack_from('<BIHII', payload)
+gnss_synced = payload[15]
+sync_age = struct.unpack_from('<I', payload, 16)[0]
+```
+
+---
+
 ## Emission sequence
 
 ```
@@ -202,6 +233,9 @@ Every 10 s:
 
 Every 30 s (in addition to measurement cycle):
   ENV      (0x08)
+
+Every 60 s (broadcast, target_system=0, target_component=0):
+  ALIVE    (0x09)
 
 On GNSS fix or re-sync after fix loss:
   TIMESYNC (0x02)
@@ -221,4 +255,5 @@ $START,<count>,<start_systime>
 $E,<event_time>,<event_channel>
 $STOP,<count>,<tm>.<tm_s100>,<stop_systime>,<events_total>,<hist_0>,...,<hist_63>
 $ENV,<count>,<tm>.<tm_s100>,<tempC>,<humidity>
+$ALIVE,<uptime_s>,<count>,<cum_pulses>,<events_min>,<gnss_synced>,<sync_age>
 ```

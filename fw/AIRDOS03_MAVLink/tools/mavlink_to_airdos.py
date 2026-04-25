@@ -30,6 +30,7 @@ SUB_HIST_LO  = 0x05
 SUB_HIST_HI  = 0x06
 SUB_EVENTS   = 0x07
 SUB_ENV      = 0x08
+SUB_ALIVE    = 0x09
 
 
 def sn_hex(raw_bytes):
@@ -93,6 +94,15 @@ def parse_env(payload, cycles):
         return
     _, cnt, tm, tm_s100, temp, hum = struct.unpack_from(fmt, payload)
     print(f"$ENV,{cnt},{tm}.{tm_s100:02d},{temp:.1f},{hum:.1f}")
+
+
+def parse_alive(payload):
+    if len(payload) < 20:
+        return
+    _, uptime, cnt, cum_pulses, evt_min = struct.unpack_from('<BIHII', payload)
+    gnss_synced = payload[15]
+    sync_age = struct.unpack_from('<I', payload, 16)[0]
+    print(f"$ALIVE,{uptime},{cnt},{cum_pulses},{evt_min},{gnss_synced},{sync_age}")
 
 
 def flush_cycle(count, cycle):
@@ -187,6 +197,9 @@ def process_message(msg, cycles):
 
     elif sub == SUB_ENV:
         parse_env(payload, cycles)
+
+    elif sub == SUB_ALIVE:
+        parse_alive(payload)
 
     # Check if any cycle is now complete
     done = [cnt for cnt, cyc in cycles.items() if cyc.complete()]
