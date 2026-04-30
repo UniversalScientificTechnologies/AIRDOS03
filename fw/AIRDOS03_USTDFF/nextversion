@@ -1,5 +1,9 @@
 #this file is maintained by github actions
 MAJOR 1
-MINOR 2
+MINOR 3
 RELEASE 0
+<<<<<<< HEAD
 BUILD 41
+=======
+BUILD 42
+>>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
