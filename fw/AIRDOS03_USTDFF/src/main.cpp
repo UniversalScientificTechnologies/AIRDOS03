@@ -54,7 +54,7 @@ TX1/INT1 (D 11) PD3  |        | PC2 (D 18) TCK
 */
 
 // ---------------------------------------------------------------------------
-// Measurement buffers  (written from ISR)
+// Measurement buffers  (written from main-loop ADC polling)
 // ---------------------------------------------------------------------------
 uint16_t          histogram[THRESHOLD];
 volatile uint16_t event_time[MAX_EVENTS];
@@ -86,6 +86,8 @@ unsigned long lastStatusMs  = 0;
 char    nmea_buf[100];
 uint8_t nmea_len = 0;
 
+static void readNMEA();
+
 // ===========================================================================
 // ISR: GNSS 1PPS on PD4 (PCINT28 → PCINT3_vect)
 // Rising edge: start of a new UTC second.
@@ -105,10 +107,10 @@ ISR(PCINT3_vect)
 }
 
 // ===========================================================================
-// ISR: ADC CONV on PB0 (PCINT8 → PCINT1_vect)
-// Rising edge: ADC conversion ready — read value via raw SPI.
+// ADC CONV polling on PB0
+// High CONV level means ADC conversion ready — read value via raw SPI.
 // ===========================================================================
-ISR(PCINT1_vect)
+static inline void serviceADC()
 {
   if (!(PINB & (1 << 0))) return;   // ignore falling edge
 
@@ -141,6 +143,16 @@ ISR(PCINT1_vect)
       event_channel[events_counter] = adcVal;
     }
     events_counter++;
+  }
+}
+
+static void serviceADCAndNMEAFor(uint16_t waitMs)
+{
+  unsigned long start = millis();
+  while ((unsigned long)(millis() - start) < waitMs)
+  {
+    serviceADC();
+    readNMEA();
   }
 }
 
@@ -334,6 +346,7 @@ static void readNMEA()
 {
   while (Serial1.available())
   {
+    serviceADC();
     char c = (char)Serial1.read();
     if (c == '$')
     {
@@ -400,6 +413,7 @@ void DataOut()
   // $E — individual above-threshold events
   for (uint16_t n = 0; n < evCount && n < MAX_EVENTS; n++)
   {
+    serviceADC();
     Serial.print("\r\n$E,");
     Serial.print(event_time[n]);
     Serial.print(",");
@@ -420,6 +434,7 @@ void DataOut()
 
   for (uint16_t n = 0; n < THRESHOLD; n++)
   {
+    serviceADC();
     Serial.print(",");
     Serial.print(histogram[n]);
   }
@@ -440,7 +455,7 @@ void StatusOut()
   Wire.write((uint8_t)0x00);
   if (Wire.endTransmission() == 0)
   {
-    delay(15);
+    serviceADCAndNMEAFor(15);
     Wire.requestFrom((uint8_t)0x45, (uint8_t)6);
     if (Wire.available() >= 6)
     {
@@ -492,10 +507,6 @@ void setup()
   digitalWrite(DSET,   HIGH);
   digitalWrite(DRESET, HIGH);
 
-  // PCINT1: PB0 (CONV) — ADC event capture  (PB0 = PCINT8, bit 0 of PCMSK1)
-  PCICR  |= (1 << PCIE1);
-  PCMSK1 |= (1 << 0);
-
   // PCINT3: PD4 (1PPS) — GNSS seconds tick  (PD4 = PCINT28, bit 4 of PCMSK3)
   PCICR  |= (1 << PCIE3);
   PCMSK3 |= (1 << 4);
@@ -544,6 +555,7 @@ void setup()
 
 void loop()
 {
+  serviceADC();
   readNMEA();
 
   unsigned long now = millis();
@@ -555,13 +567,11 @@ void loop()
 
     DataOut();
 
-    cli();
     memset(histogram,            0, sizeof(histogram));
     memset((void*)event_time,    0, sizeof(event_time));
     memset((void*)event_channel, 0, sizeof(event_channel));
     events_counter = 0;
     startSystime   = TCNT1;
-    sei();
 
     // Re-arm peak detector
     digitalWrite(DSET,   HIGH);

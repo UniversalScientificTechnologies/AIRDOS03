@@ -15,6 +15,11 @@ Each project can be built locally with:
 ```bash
 pio run --project-dir fw/<project_name>
 ```
+And uploaded with:
+
+```bash
+pio run --project-dir fw/<project_name> -t upload
+```
 
 ## Flashing
 
