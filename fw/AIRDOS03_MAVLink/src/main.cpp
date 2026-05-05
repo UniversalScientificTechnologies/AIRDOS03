@@ -51,7 +51,7 @@ static void SendTunnelBroadcast(uint8_t *data, uint8_t len,
 }
 
 // ---------------------------------------------------------------------------
-// Measurement buffers  (written from ISR)
+// Measurement buffers  (written from main-loop ADC polling)
 // ---------------------------------------------------------------------------
 uint16_t          histogram[THRESHOLD];
 volatile uint16_t event_time[MAX_EVENTS];
@@ -89,6 +89,8 @@ unsigned long lastAliveMs   = 0;
 char    nmea_buf[100];
 uint8_t nmea_len = 0;
 
+static void readNMEA();
+
 // ===========================================================================
 // ISR: GNSS 1PPS on PD4 (PCINT28 → PCINT3_vect)
 // ===========================================================================
@@ -107,9 +109,9 @@ ISR(PCINT3_vect)
 }
 
 // ===========================================================================
-// ISR: ADC CONV on PB0 (PCINT8 → PCINT1_vect)
+// ADC CONV polling on PB0
 // ===========================================================================
-ISR(PCINT1_vect)
+static inline void serviceADC()
 {
   if (!(PINB & (1 << 0))) return;   // ignore falling edge
 
@@ -144,6 +146,16 @@ ISR(PCINT1_vect)
     }
     events_counter++;
     events_min_count++;             // counted every event (incl. > MAX_EVENTS)
+  }
+}
+
+static void serviceADCAndNMEAFor(uint16_t waitMs)
+{
+  unsigned long start = millis();
+  while ((unsigned long)(millis() - start) < waitMs)
+  {
+    serviceADC();
+    readNMEA();
   }
 }
 
@@ -225,7 +237,7 @@ static void SendENV()
   Wire.write((uint8_t)0x00);
   if (Wire.endTransmission() != 0) return;
 
-  delay(15);
+  serviceADCAndNMEAFor(15);
   Wire.requestFrom((uint8_t)0x45, (uint8_t)6);
   if (Wire.available() < 6) return;
 
@@ -338,6 +350,7 @@ static void readNMEA()
 {
   while (Serial1.available())
   {
+    serviceADC();
     char c = (char)Serial1.read();
     if (c == '$')
     {
@@ -409,6 +422,7 @@ void DataOut()
 
       for (uint8_t i = 0; i < n; i++)
       {
+        serviceADC();
         uint16_t et = event_time[base + i];
         uint16_t ec = event_channel[base + i];
         memcpy(buf + 9 + i * 4,     &et, 2);
@@ -438,6 +452,7 @@ void DataOut()
     memcpy(buf + 1, &count, 2);
     for (uint8_t i = 0; i < 32; i++)
     {
+      serviceADC();
       memcpy(buf + 3 + i * 2, &histogram[i], 2);
     }
     SendTunnelData(buf, sizeof(buf));
@@ -450,6 +465,7 @@ void DataOut()
     memcpy(buf + 1, &count, 2);
     for (uint8_t i = 0; i < 32; i++)
     {
+      serviceADC();
       memcpy(buf + 3 + i * 2, &histogram[32 + i], 2);
     }
     SendTunnelData(buf, sizeof(buf));
@@ -485,10 +501,6 @@ void setup()
 
   digitalWrite(DSET,   HIGH);
   digitalWrite(DRESET, HIGH);
-
-  // PCINT1: PB0 (CONV)  (PB0 = PCINT8, bit 0 of PCMSK1)
-  PCICR  |= (1 << PCIE1);
-  PCMSK1 |= (1 << 0);
 
   // PCINT3: PD4 (1PPS)  (PD4 = PCINT28, bit 4 of PCMSK3)
   PCICR  |= (1 << PCIE3);
@@ -556,6 +568,7 @@ void setup()
 
 void loop()
 {
+  serviceADC();
   readNMEA();
 
   unsigned long now = millis();
@@ -567,13 +580,11 @@ void loop()
 
     DataOut();
 
-    cli();
     memset(histogram,            0, sizeof(histogram));
     memset((void*)event_time,    0, sizeof(event_time));
     memset((void*)event_channel, 0, sizeof(event_channel));
     events_counter = 0;
     startSystime   = TCNT1;
-    sei();
 
     // Re-arm peak detector
     digitalWrite(DSET,   HIGH);
