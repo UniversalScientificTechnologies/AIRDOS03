@@ -19,23 +19,6 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #include <Wire.h>
 #include <SPI.h>
 
-<<<<<<< HEAD
-// PC0=SCL PC1=SDA 
-#define CONV0        0     // PB0=0, ADC CONV signal
-#define CONV1        1     // PB1=1, ADC CONV signal
-#define DRESET      18    // PC2, ADC CONV command
-#define DSET        15    // PD7, ADC chip enable
-#define MUX0        24    // PA0=24 
-#define MUX1        25    // PA1=25 
-#define LED1        PIN_LED_RED   // red PC5
-#define LED2        PIN_LED_BLUE  // blue PC6
-#define LED3        PIN_LED_GREEN // green PC7
-#define POWER5V     26   // PA2
-#define POWER3V3    2    // PB2
-#define TP1         20   // PC3
-#define TP2         20   // PC4
-#define ACONNECT    27   // PA3
-=======
 #define CONV   0   // PB0  — ADC CONV signal   (PCINT0,  PCINT0_vect)
 #define PPS    12  // PD4  — GNSS 1PPS          (PCINT12, PCINT1_vect)
 #define DRESET 18  // PC2  — ADC peak-det reset
@@ -43,7 +26,6 @@ String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-
 #define LED1   PIN_LED_RED
 #define LED2   PIN_LED_BLUE
 #define LED3   PIN_LED_GREEN
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
 
 /*
                      Mighty 1284p
@@ -80,13 +62,6 @@ volatile uint16_t event_channel[MAX_EVENTS];
 volatile uint16_t events_counter = 0;
 volatile uint16_t startSystime   = 0;
 
-<<<<<<< HEAD
-uint16_t count = 0;
-uint8_t histogram0[CHANNELS];
-uint8_t histogram1[CHANNELS];
-uint8_t ADCconf1;
-uint8_t ADCconf2;
-=======
 // ---------------------------------------------------------------------------
 // Time-keeping
 // ---------------------------------------------------------------------------
@@ -104,7 +79,6 @@ bool     gnss_had_fix     = false;      // status flag from previous $GPRMC
 uint16_t count    = 0;
 uint8_t  ADCconf1 = 0;
 uint8_t  ADCconf2 = 0;
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
 
 unsigned long lastDataOutMs = 0;
 unsigned long lastStatusMs  = 0;
@@ -408,10 +382,6 @@ static void printHexSN(uint8_t eepromAddr)
 
 void DataOut()
 {
-<<<<<<< HEAD
-  Serial.print("$HIST0,");
-  Serial.print(count);
-=======
   uint32_t tm; uint8_t tm_s100;
   getCurrentTime(tm, tm_s100);
 
@@ -426,7 +396,6 @@ void DataOut()
   Serial.print(count);
   Serial.print(",");
   Serial.println(captStart);
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
 
   // $E — individual above-threshold events
   for (uint16_t n = 0; n < evCount && n < MAX_EVENTS; n++)
@@ -452,17 +421,7 @@ void DataOut()
   for (uint16_t n = 0; n < THRESHOLD; n++)
   {
     Serial.print(",");
-    Serial.print(histogram0[n]);
-  }
-  Serial.println();
-
-  Serial.print("$HIST1,");
-  Serial.print(count);
-
-  for (uint16_t n = 0; n < CHANNELS; n++)
-  {
-    Serial.print(",");
-    Serial.print(histogram1[n]);
+    Serial.print(histogram[n]);
   }
   Serial.println();
 
@@ -515,26 +474,8 @@ void setup()
   Serial1.begin(38400);     // GNSS NMEA output
   Wire.setClock(100000);
   SPI.begin();
-  SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
+  SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
 
-<<<<<<< HEAD
-  pinMode(ACONNECT, INPUT);
-  pinMode(CONV0, INPUT);
-  pinMode(CONV1, INPUT);
-  pinMode(DRESET, OUTPUT);
-  pinMode(DSET, OUTPUT);
-  pinMode(LED1, OUTPUT);
-  pinMode(LED2, OUTPUT);
-  pinMode(LED3, OUTPUT);
-  pinMode(MUX0, OUTPUT);
-  pinMode(MUX1, OUTPUT);
-  
-  digitalWrite(DSET, HIGH);
-  digitalWrite(DRESET, HIGH);
-  digitalWrite(MUX0, HIGH);
-  digitalWrite(MUX1, HIGH);
-  
-=======
   // Timer1: normal mode, prescaler 1024 → 128 µs/tick at 8 MHz
   TCCR1A = 0;
   TCCR1B = (1 << CS12) | (1 << CS10);
@@ -559,7 +500,6 @@ void setup()
   PCICR  |= (1 << PCIE3);
   PCMSK3 |= (1 << 4);
 
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
   Serial.println("#Cvak...");
 
   String dataString = "$DOS," TYPE "," + FWversion + ",0," + githash + ",";
@@ -587,28 +527,12 @@ void setup()
   digitalWrite(LED1, LOW);
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
-  digitalWrite(LED1, HIGH);
-  delay(500);
-  digitalWrite(LED2, HIGH);
-  delay(500);
-  digitalWrite(LED3, HIGH);
-  delay(500);
-  digitalWrite(LED1, LOW);
-  delay(500);
-  digitalWrite(LED2, LOW);
-  delay(500);
-  digitalWrite(LED3, LOW);
 
-<<<<<<< HEAD
-  memset(histogram0, 0, sizeof(histogram0));
-  memset(histogram1, 0, sizeof(histogram1));
-=======
   memset(histogram,            0, sizeof(histogram));
   memset((void*)event_time,    0, sizeof(event_time));
   memset((void*)event_channel, 0, sizeof(event_channel));
   events_counter = 0;
 
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
   lastDataOutMs = millis();
   lastStatusMs  = millis();
   startSystime  = TCNT1;
@@ -620,107 +544,14 @@ void setup()
 
 void loop()
 {
-<<<<<<< HEAD
-  uint16_t adcVal; 
-while (true)
-{
-  while ((PINB & 0b11) == 0);
-  {
-    uint8_t COINCIDENCE = PINB & 0b11;
-=======
   readNMEA();
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
 
-    PORTA = (PORTA & ~0b11) | 0b10; // MUX0=0, MUX1=1
-    PORTD=0b01111111; // #DSET=0
-    PORTD=0b11111111; // #DSET=1
-
-    //digitalWrite(DRESET, LOW);
-    delayMicroseconds(3); 
-    PORTC=0b00011011; // #DRESET=0
-    uint16_t adcVal0 = SPI.transfer16(0x0000);
-    //adcVal = adcVal0 >> 4;
-    //adcVal &= 0x3FF;
-    //if (histogram0[adcVal] < 255) histogram0[adcVal]++;
-    PORTC=0b00011111; // #DRESET=1
-
-    PORTA = (PORTA & ~0b11) | 0b01; // MUX0=1, MUX1=0
-    PORTD=0b01111111; // #DSET=0
-    PORTD=0b11111111; // #DSET=1
-
-    delayMicroseconds(3);
-    PORTC=0b00011011; // #DRESET=0
-    uint16_t adcVal1 = SPI.transfer16(0x0000);
-    //adcVal = adcVal1 >> 4;
-    //adcVal &= 0x3FF;
-    //if (histogram1[adcVal] < 255) histogram1[adcVal]++;
-    PORTC=0b00011111; // #DRESET=1
-
-    PORTA = (PORTA & ~0b11) | 0b10; // MUX0=0, MUX1=1
-    PORTD=0b01111111; // #DSET=0
-    PORTD=0b11111111; // #DSET=1
-
-    //digitalWrite(DRESET, LOW);
-    delayMicroseconds(3); 
-    PORTC=0b00011011; // #DRESET=0
-    uint16_t adcVal0b = SPI.transfer16(0x0000);
-    //adcVal = adcVal0b >> 4;
-    //adcVal &= 0x3FF;
-    //if (histogram0[adcVal] < 255) histogram0[adcVal]++;
-    PORTC=0b00011111; // #DRESET=1
-
-    PORTA = (PORTA & ~0b11) | 0b01; // MUX0=1, MUX1=0
-    PORTD=0b01111111; // #DSET=0
-    PORTD=0b11111111; // #DSET=1
-
-    delayMicroseconds(3);
-    PORTC=0b00011011; // #DRESET=0
-    uint16_t adcVal1b = SPI.transfer16(0x0000);
-    //adcVal = adcVal1b >> 4;
-    //adcVal &= 0x3FF;
-    //if (histogram1[adcVal] < 255) histogram1[adcVal]++;
-    PORTC=0b00011111; // #DRESET=1
-
-    if (adcVal0 >100 || adcVal1 > 100)
-    if (adcVal0 > adcVal0b)
-    if (adcVal1 > adcVal1b)
-    {
-      digitalWrite(LED1, HIGH);
-      Serial.print("$C,");
-      Serial.print(COINCIDENCE);
-      Serial.print(",");
-      Serial.print(adcVal0);
-      Serial.print(",");
-      Serial.print(adcVal0b);
-      Serial.print(",");
-      Serial.print(adcVal1);
-      Serial.print(",");
-      Serial.print(adcVal1b);
-      Serial.println();
-    }
-    else
-    {
-      digitalWrite(LED1, LOW);
-    }
-
-    PORTA = (PORTA & ~0b11) | 0b00; // MUX0=0, MUX1=0
-    PORTC=0b00011011; // #DRESET=0
-    PORTC=0b00011111; // #DRESET=1
-
-  }
-}
   unsigned long now = millis();
 
   if (now - lastDataOutMs >= 10000UL)
   {
     lastDataOutMs = now;
     digitalWrite(LED2, HIGH);
-<<<<<<< HEAD
-    DataOut();
-    memset(histogram0, 0, sizeof(histogram0));
-    memset(histogram1, 0, sizeof(histogram1));
-=======
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
 
     DataOut();
 
@@ -741,15 +572,9 @@ while (true)
     digitalWrite(LED2, LOW);
   }
 
-<<<<<<< HEAD
-  /*
-  if (now - lastStatusMs >= 60000)
-=======
   if (now - lastStatusMs >= 30000UL)
->>>>>>> dd1e1490fb8c30a7d62b03c3b41b7fc9b600fe2d
   {
     lastStatusMs = now;
     StatusOut();
   }
-  */
 }
