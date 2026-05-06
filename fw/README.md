@@ -5,7 +5,7 @@ Firmware projects are maintained as standalone PlatformIO projects in:
 - `fw/AIRDOS03_MAVLink`
 - `fw/AIRDOS03_USTDFF`
 
-Each firmware project keeps `platformio.ini` as a symlink to the canonical configuration in TFUNIPAYLOAD01:
+Each firmware project keeps `platformio.ini` as a symlink to the canonical configuration of [TFUNIPAYLOAD01](https://docs.thunderfly.cz/avionics/TFUNIPAYLOAD01/):
 
 - `fw/AIRDOS03_MAVLink/platformio.ini -> ../../hw/modules/TFUNIPAYLOAD01/fw/platformio.ini`
 - `fw/AIRDOS03_USTDFF/platformio.ini -> ../../hw/modules/TFUNIPAYLOAD01/fw/platformio.ini`
