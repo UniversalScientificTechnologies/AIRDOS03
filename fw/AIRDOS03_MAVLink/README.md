@@ -14,15 +14,49 @@ Using avrdude directly:
 avrdude -v -patmega1284p -carduino -P/dev/ttyUSB0 -b57600 -D -Uflash:w:firmware.hex:i
 ```
 
-## Decode to text format
+## Data processing tools
 
-```
+Three Python tools are provided in [`tools/`](tools/). All three produce or consume the same AIRDOS04-compatible ASCII format (identical to `fw/AIRDOS03_USTDFF` output).
+
+### `mavlink_to_airdos.py`
+
+Decodes a live MAVLink tunnel stream from the UART port, or a previously captured binary file, and writes AIRDOS04-compatible ASCII to stdout. Requires `pymavlink`.
+
+```bash
 pip install pymavlink
+
+# live serial capture
 python tools/mavlink_to_airdos.py --port /dev/ttyUSB0 --baud 115200
-python tools/mavlink_to_airdos.py --stdin < capture.bin
+
+# from a captured binary file
+python tools/mavlink_to_airdos.py --stdin < capture.bin > output.txt
 ```
 
-Output is AIRDOS04-compatible ASCII format (same as `fw/AIRDOS03_USTDFF`).
+### `ulog_to_airdos.py`
+
+Extracts AIRDOS03B MAVLink tunnel messages from a PX4 ULog file (`.ulg`) logged by a TF-ATMON flight system and converts them to AIRDOS04-compatible ASCII. This is the standard data-recovery path after a TF-ATMON flight. Requires `pyulog`.
+
+```bash
+pip install pyulog
+
+python tools/ulog_to_airdos.py log100.ulg > output.txt
+```
+
+### `flux_analysis.py`
+
+Jupyter-style analysis script that reads a ULog file and produces two figures:
+
+- **`flux_graph.png`** — particle flux per 10-second cycle over time, with a smoothed overlay, barometric altitude on a secondary axis, and vibration/temperature diagnostics in a third panel.
+- **`flux_vs_altitude.png`** — flux as a function of altitude with per-kilometre binned mean, produced when GPS timing is available.
+
+Configure the input file and channel threshold at the top of the script (`ULOG_FILE`, `HIST_MIN_CHANNEL`). Requires `pyulog`, `pandas`, and `matplotlib`.
+
+```bash
+pip install pyulog pandas matplotlib
+
+# edit ULOG_FILE at the top of the script, then:
+python tools/flux_analysis.py
+```
 
 
 ## MAVLink Packet Protocol
