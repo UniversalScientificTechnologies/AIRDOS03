@@ -24,6 +24,8 @@ The detector covers an energy range of approximately 40 keV to 80 MeV with an en
 
 To support the correction of radiation data to local atmospheric conditions, AIRDOS03 includes integrated sensors for temperature and relative humidity. The temperature range spans −40 to +80 °C with an accuracy of approximately ±0.5 °C, and relative humidity is measured from 0 to 100 %RH with ±2 %RH accuracy.
 
+![FIK-10 stratospheric balloon flight data measured with AIRDOS03](https://raw.githubusercontent.com/ODZ-UJF-AV-CR/FIK-10/refs/heads/main/doc/img/flight_data.png)
+
 ## Mechanical and electrical characteristics
 
 AIRDOS03 has a compact, lightweight form factor suitable for airframe integration. The electronics measure approximately 91 × 51 × 20 mm and have a total mass of about 40 g. The device is powered from a 5 V supply and typically draws around 3 mA, making it compatible even with small UAV platforms where power and mass budgets are limited.
@@ -73,7 +75,20 @@ Typical applications of AIRDOS03 include UAV‑based atmospheric radiation surve
 
 ## Software and firmware
 
-AIRDOS03 uses modular, open-source firmware that can be adapted for specific scientific missions. Output formats are suitable for post-processing.
+AIRDOS03 uses modular, open-source firmware maintained as PlatformIO projects under [`fw/`](fw/). Two firmware variants are available, each selecting a different output format on the UART port:
+
+| Variant | Directory | Output format | Primary use |
+|---|---|---|---|
+| **MAVLink** | `fw/AIRDOS03_MAVLink` | MAVLink TUNNEL packets at 115200 bps | Integration with PX4/ArduPilot autopilots via TF-ATMON |
+| **UST DFF** | `fw/AIRDOS03_USTDFF` | UST Dosimeters File Format (ASCII) at 115200 bps | Stand-alone loggers, USB/serial capture, compatibility with AIRDOS04/SPACEDOS toolchain |
+
+Pre-built `.hex` binaries for both variants are available in [`fw/build/`](fw/build/). See [`fw/README.md`](fw/README.md) for build and flashing instructions.
+
+The MAVLink variant ships with Python post-processing tools in [`fw/AIRDOS03_MAVLink/tools/`](fw/AIRDOS03_MAVLink/tools/):
+
+- **`mavlink_to_airdos.py`** — converts a live serial stream or captured binary file to AIRDOS04-compatible ASCII text
+- **`ulog_to_airdos.py`** — extracts AIRDOS03B data from a PX4 ULog file (`.ulg`) produced by the TF-ATMON flight logger
+- **`flux_analysis.py`** — Jupyter-style analysis script: reads a ULog file and plots particle flux over time with altitude and vibration overlays
 
 ## Availability
 
