@@ -129,7 +129,6 @@ static inline void serviceADC()
   PORTC |= (1 << 2);                // DRESET HIGH
 
   uint16_t adcVal = ((uint16_t)hi << 8) | lo;
-  adcVal >>= 2;                     // 12-bit SPI word → 10-bit ADC value
 
   if (adcVal < THRESHOLD)
   {
