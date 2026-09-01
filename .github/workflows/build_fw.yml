@@ -180,7 +180,7 @@ jobs:
         run: |
           # Build file pattern dynamically based on what exists
           PATTERN="fw/*"
-#          PATTERN="$PATTERN AIRDOS/src/githash.h AIRDOS/nextversion"
+          # PATTERN="$PATTERN AIRDOS/src/githash.h AIRDOS/nextversion"
           echo "pattern=$PATTERN" >> $GITHUB_OUTPUT
           echo "Generated pattern: $PATTERN"
 
