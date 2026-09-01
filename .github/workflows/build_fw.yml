@@ -195,9 +195,12 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SIGNING_KEY }}" > ~/.ssh/signing_key
+          echo "${{ secrets.LOGIN_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/signing_key
+          chmod 600 ~/.ssh/id_rsa
 
           ssh-keygen -y -f ~/.ssh/signing_key > ~/.ssh/signing_key.pub
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
 
           git config --global user.name "ustbot"
           git config --global user.email "ust-bot@seznam.cz"
@@ -216,7 +219,11 @@ jobs:
           git diff --cached --quiet && exit 0
 
           git commit -m "${{ steps.last-commit-message.outputs.msg }}, extended build"
-          git remote -v
-          git push
+
+          SSH_REMOTE=`git remote -v |head -n 1| cut -f 2|sed -e 's/https:\/\/github.com/git@github.com:/g'`".git"
+          echo $SSH_REMOTE
+
+          git remote add ssh_remote $SSH_REMOTE
+          git push ssh_remote 
 
 
