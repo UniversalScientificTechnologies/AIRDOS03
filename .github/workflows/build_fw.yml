@@ -175,6 +175,16 @@ jobs:
 
           git status
 
+      - name: Generate file pattern
+        id: file-pattern
+        run: |
+          # Build file pattern dynamically based on what exists
+          PATTERN="fw/*"
+#          PATTERN="$PATTERN AIRDOS/src/githash.h AIRDOS/nextversion"
+          echo "pattern=$PATTERN" >> $GITHUB_OUTPUT
+          echo "Generated pattern: $PATTERN"
+
+
       - name: Get last commit message
         id: last-commit-message
         run: |
