@@ -220,7 +220,7 @@ jobs:
 
           git commit -m "${{ steps.last-commit-message.outputs.msg }}, extended build"
 
-          SSH_REMOTE=`git remote -v |head -n 1| cut -f 2|sed -e 's/https:\/\/github.com/git@github.com:/g'`".git"
+          SSH_REMOTE=`git remote -v | head -n 1 | cut -f 2 | cut -d ' ' -f1 | sed -e 's/https:\/\/github.com/git@github.com:/g'`".git"
           echo $SSH_REMOTE
 
           git remote add ssh_remote $SSH_REMOTE
