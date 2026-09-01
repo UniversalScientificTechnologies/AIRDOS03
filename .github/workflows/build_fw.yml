@@ -72,8 +72,8 @@ jobs:
             else
               PREVMAJOR=$(grep '^#define MAJOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
               PREVMINOR=$(grep '^#define MINOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
-              NEXTRELEASE=0
-              NEXTBUILD=0
+              NEXTRELEASE=1
+              NEXTBUILD=1
             fi
 
             CURMAJOR=$(grep '^#define MAJOR' "fw/${{ matrix.type }}/src/main.cpp" | head -n 1 | awk '{print $3}')
@@ -83,7 +83,7 @@ jobs:
               echo "Same version"
             else
               echo "New version, set release to 0"
-              NEXTRELEASE=0
+              NEXTRELEASE=1
             fi
 
             echo "// This file is overwritten by github actions, do not update it manually" > githash.h
