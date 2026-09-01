@@ -150,8 +150,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.pat }}
+        #with:
+        #  token: ${{ secrets.pat }}
 
       - run: |
           rm -rf fw/build || true
