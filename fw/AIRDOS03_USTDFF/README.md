@@ -8,11 +8,20 @@ The UART port runs at **115200 bps**, 8N1, no hardware flow control required for
 
 ```bash
 # build only
-pio run --project-dir fw/AIRDOS03_USTDFF
+pio run --project-dir fw/AIRDOS03_USTDFF -e TFUNIPAYLOAD01_uart
 
-# build and upload (resets the board via CTS to enter the bootloader first)
-pio run --project-dir fw/AIRDOS03_USTDFF -t upload
+# build and upload via the UART bootloader
+pio run --project-dir fw/AIRDOS03_USTDFF -e TFUNIPAYLOAD01_uart -t upload
 ```
+
+Uploading over UART requires the bootloader to be active. `avrdude` (via the
+`arduino` upload protocol) toggles the DTR/RTS control lines on the host
+serial port to reset the target automatically. When using a
+[TFUSBSERIAL01](https://docs.thunderfly.cz/tools/TFUSBSERIAL01/) USB-serial
+adapter, its RTS output is wired to the board's CTS pin, so this
+auto-reset works out of the box with `pio run -t upload`. With a generic
+USB-serial adapter without that wiring, reset the board manually before
+running the upload.
 
 ## Flashing pre-built binary with avrdude
 

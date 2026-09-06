@@ -8,8 +8,14 @@
 
 // ADC values below THRESHOLD go to the histogram.
 // Values >= THRESHOLD are recorded as individual $E events.
+// MAX_EVENTS sized against the ATmega1284P's 16 KB SRAM: each slot costs
+// 4 bytes (event_time + event_channel), so 1000 slots is 4000 bytes — about
+// a quarter of SRAM — leaving most of it free for the stack while covering
+// well over the previous 300-event/10 s (30 Hz) cap. Above-threshold events
+// beyond this cap are still dropped (events_counter keeps counting the true
+// total; dosview detects and warns about the shortfall).
 #define THRESHOLD  64
-#define MAX_EVENTS 300
+#define MAX_EVENTS 1000
 
 #include <Wire.h>
 #include <SPI.h>
@@ -473,6 +479,31 @@ void DataOut()
   count++;
 }
 
+// Emit a DataOut() record and start a fresh measurement interval.
+// Called both on the regular 10 s tick and early (from loop()) when the
+// above-threshold event buffer fills up, so a full buffer never sits idle
+// discarding events for the remainder of the interval.
+static inline void flushDataOut()
+{
+  digitalWrite(LED2, HIGH);
+
+  DataOut();
+
+  memset(histogram,            0, sizeof(histogram));
+  memset((void*)event_time,    0, sizeof(event_time));
+  memset((void*)event_channel, 0, sizeof(event_channel));
+  events_counter = 0;
+  startSystime   = TCNT1;
+
+  // Re-arm peak detector
+  digitalWrite(DSET,   HIGH);
+  digitalWrite(DRESET, LOW);
+  SPI.transfer16(0x0000);
+  digitalWrite(DRESET, HIGH);
+
+  digitalWrite(LED2, LOW);
+}
+
 // ===========================================================================
 // setup
 // ===========================================================================
@@ -572,26 +603,15 @@ void loop()
 
   unsigned long now = millis();
 
-  if (now - lastDataOutMs >= 10000UL)
+  // Flush early once the above-threshold event buffer is full: waiting for
+  // the 10 s tick would just mean every event above THRESHOLD for the rest
+  // of the interval is silently dropped while channels below THRESHOLD keep
+  // being recorded, distorting the spectrum. Starting a fresh interval right
+  // away instead keeps every interval's data complete.
+  if (now - lastDataOutMs >= 10000UL || events_counter >= MAX_EVENTS)
   {
     lastDataOutMs = now;
-    digitalWrite(LED2, HIGH);
-
-    DataOut();
-
-    memset(histogram,            0, sizeof(histogram));
-    memset((void*)event_time,    0, sizeof(event_time));
-    memset((void*)event_channel, 0, sizeof(event_channel));
-    events_counter = 0;
-    startSystime   = TCNT1;
-
-    // Re-arm peak detector
-    digitalWrite(DSET,   HIGH);
-    digitalWrite(DRESET, LOW);
-    SPI.transfer16(0x0000);
-    digitalWrite(DRESET, HIGH);
-
-    digitalWrite(LED2, LOW);
+    flushDataOut();
   }
 
   if (now - lastStatusMs >= 30000UL)

@@ -18,18 +18,23 @@ AIRDOS03_MAVLink/platformio.ini  ->  ../../hw/modules/TFUNIPAYLOAD01/fw/platform
 AIRDOS03_USTDFF/platformio.ini   ->  ../../hw/modules/TFUNIPAYLOAD01/fw/platformio.ini
 ```
 
-Build a variant:
+Build a variant (UART bootloader environment):
 
 ```bash
-pio run --project-dir fw/AIRDOS03_MAVLink
+pio run --project-dir fw/AIRDOS03_MAVLink -e TFUNIPAYLOAD01_uart
 # or
-pio run --project-dir fw/AIRDOS03_USTDFF
+pio run --project-dir fw/AIRDOS03_USTDFF -e TFUNIPAYLOAD01_uart
 ```
 
-Build and upload directly (requires the UART bootloader to be active — reset the board via the CTS pin before running):
+Build and upload via the UART bootloader (requires the bootloader to be
+active — `avrdude` toggles DTR/RTS on the host serial port to reset the
+target; with a
+[TFUSBSERIAL01](https://docs.thunderfly.cz/tools/TFUSBSERIAL01/) adapter its
+RTS output is wired to the board's CTS pin, so this happens automatically;
+with a generic adapter, reset the board manually first):
 
 ```bash
-pio run --project-dir fw/AIRDOS03_MAVLink -t upload
+pio run --project-dir fw/AIRDOS03_MAVLink -e TFUNIPAYLOAD01_uart -t upload
 ```
 
 ## Flashing with avrdude
