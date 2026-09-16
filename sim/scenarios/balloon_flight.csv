@@ -1,0 +1,13 @@
+# Stratospheric balloon flight, time axis compressed 4x (real ascent ~2 h).
+# Linear interpolation between points.
+# t_s, temp_c, rh_pct, rate_cps
+0,     22.0,  55,   0.5
+120,   15.0,  60,   0.6
+300,   -5.0,  70,   1.5
+600,  -35.0,  40,   6.0
+900,  -55.0,  10,  18.0
+1200, -60.0,   3,  30.0
+1500, -52.0,   1,  24.0
+1800, -45.0,   1,  20.0
+2100,  -5.0,  60,   2.0
+2250,  18.0,  55,   0.6

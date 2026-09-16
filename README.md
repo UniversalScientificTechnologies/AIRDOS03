@@ -90,6 +90,10 @@ The MAVLink variant ships with Python post-processing tools in [`fw/AIRDOS03_MAV
 - **`ulog_to_airdos.py`** — extracts AIRDOS03B data from a PX4 ULog file (`.ulg`) produced by the TF-ATMON flight logger
 - **`flux_analysis.py`** — Jupyter-style analysis script: reads a ULog file and plots particle flux over time with altitude and vibration overlays
 
+### Firmware simulation
+
+The firmware can be run without hardware in the [simavr](https://github.com/buserror/simavr) AVR emulator with models of the digital peripherals (EEPROMs, SHT31, detector ADC, GNSS). See [`sim/README.md`](sim/README.md).
+
 ## Availability
 
 AIRDOS03 can be obtained both via [ThunderFly s.r.o.](https://www.thunderfly.cz/contact-us.html) or [Universal Scientific Technologies s.r.o.](https://www.ust.cz/about/), which provides sales, integration support, and customer assistance for airborne applications. For special configurations or larger quantities, please contact us with your project requirements.

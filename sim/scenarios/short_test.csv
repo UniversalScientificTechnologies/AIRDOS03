@@ -1,0 +1,5 @@
+# Fast-changing profile for automated tests
+# t_s, temp_c, rh_pct, rate_cps
+0,    25.0, 40,   5
+30,  -20.0, 80, 200
+60,  -40.0,  5,  20
