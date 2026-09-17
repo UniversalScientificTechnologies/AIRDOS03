@@ -1,0 +1,2 @@
+# Verze kontroly formátu
+ust-format-checker @ git+https://github.com/UniversalScientificTechnologies/DOSPORTAL@devel#subdirectory=backend/packages/ust_format_checker

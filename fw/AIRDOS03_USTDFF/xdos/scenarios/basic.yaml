@@ -1,0 +1,18 @@
+# Výchozí scénář. Když zařízení žádný scénář nemá, vygeneruje se z osazení desky stejně
+# jako tenhle - viz default_scenario() ve scenario.py.
+
+name: basic
+stop_blocks: 2
+
+sensors:
+  sht31:
+    temp_c: rand(-40, 85)
+    humidity: rand(0, 100)
+
+events:
+  at: 1.2
+  channels: [0, 12, 12, 40, 63, 64, 100, 500, 1023]
+
+gnss:
+  fix_at: 1.0
+  unix: 1789560000
