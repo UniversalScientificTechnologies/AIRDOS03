@@ -17,7 +17,7 @@ právě sestavil.
 | [scenarios/basic.yaml](scenarios/basic.yaml) | co simulace do firmwaru pošle (události, senzory, GNSS) |
 | [checker.txt](checker.txt) | pinovaná verze kontroly |
 | [hook.py](hook.py) | napojení na PlatformIO (build i upload) |
-| `golden/` | referenční záznam z posledního release, zatím prázdné |
+| [golden/basic.txt](golden/basic.txt) | referenční záznam, proti kterému se hlídá zpětná kompatibilita |
 | [../xdos_check.ini](../xdos_check.ini) | extra config, který hook zapíná |
 
 Vlastní kontroly, schéma formátu a modely součástek jsou v balíčku `ust_format_checker`
@@ -29,6 +29,7 @@ společné pro všechna xDOS zařízení.
 Jediná podmínka je simavr, zbytek si hook udělá sám:
 
 ```bash
+pipx install platformio # if not available yet
 sudo apt install simavr libsimavr-dev libelf-dev gcc
 ```
 
@@ -54,8 +55,9 @@ Když pracuješ na checkeru, dá se pin obejít checkoutem DOSPORTAL:
 export XDOS_CHECKER_PATH=~/cesta/k/DOSPORTAL/backend
 ```
 
-Tahle varianta navíc kontroluje výstup parserem z DOSPORTAL, což pinovaná instalace zatím
-neumí (`packages.parsing` není samostatný balíček) a napíše to do výstupu jako info.
+Kontrolu toho, co z logu přečte parser DOSPORTAL, hook lokálně nespouští (`--no-parser`).
+Hlásila by nálezy na straně portálu, se kterými vývojář firmwaru nic neudělá. Tahle vrstva
+patří do CI; ručně ji zapneš tím, že checker spustíš bez `--no-parser`.
 
 ## Kolik to zdrží
 
@@ -100,9 +102,13 @@ odvozuje od názvu scénáře, takže běhy zůstávají reprodukovatelné:
 name: high_rate
 stop_blocks: 2
 sensors:
-  sht31: {temp_c: rand(-40, 85), humidity: rand(0, 100)}
+  sht31:
+    temp_c: rand(-40, 85)
+    humidity: rand(0, 100)
 events:
   at: 1.2
   channels: [0, 12, 40, 63, 64, 100, 500, 1023]
-gnss: {fix_at: 1.0, unix: 1789560000}
+gnss:
+  fix_at: 1.0
+  unix: 1789560000
 ```

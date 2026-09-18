@@ -3,10 +3,11 @@
 Lokálně jen varuje, build nikdy nezastaví - iterativní vývoj se tím nesmí zdržovat. Blokuje
 až CI, kde se stejná kontrola spouští s --warnings-as-errors.
 
-Kontrola běží ve vlastním venv (ne v penv PlatformIO) a verze je pinovaná v checker.txt, takže
-se při buildu nikam nesahá na síť. Poprvé se venv vytvoří, pak už se jen používá.
+Tenhle soubor umí jen tři věci: přečíst pin, zajistit venv a zavolat balíček. Co se vlastně
+kontroluje, kde leží board.yaml, scénáře a golden - to všechno patří do balíčku
+(ust_format_checker.platformio), aby se to nemuselo opravovat v každém repu zařízení zvlášť.
 
-    XDOS_CHECK=0 pio run          kontrola vypnutá
+    XDOS_CHECK=0 pio run                    kontrola vypnutá
     XDOS_CHECKER_PATH=~/DOSPORTAL/backend   vývoj proti checkoutu místo pinované verze
 """
 
@@ -19,13 +20,11 @@ from pathlib import Path
 Import("env")  # noqa: F821 - poskytuje PlatformIO
 
 # SCons skript nemá __file__, cestu proto bereme z projektu
-HERE = Path(env.subst("$PROJECT_DIR")).resolve() / "xdos"  # noqa: F821
-BOARD = HERE / "board.yaml"
-SCENARIO = HERE / "scenarios" / "basic.yaml"
-GOLDEN = HERE / "golden" / "basic.txt"
-PIN = HERE / "checker.txt"
+PROJECT = Path(env.subst("$PROJECT_DIR")).resolve()  # noqa: F821
+PIN = PROJECT / "xdos" / "checker.txt"
 
-CHECKER_ENV_VAR = "XDOS_CHECKER_PATH"
+ENTRY_POINT = "ust_format_checker.platformio"
+CHECKOUT_ENTRY_POINT = "packages.ust_format_checker.platformio"
 INSTALL_TIMEOUT_S = 300
 
 _already_ran = False
@@ -38,14 +37,10 @@ def _pinned_spec() -> str | None:
     return next((line for line in lines if line and not line.startswith("#")), None)
 
 
-def _cache_root() -> Path:
-    base = os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")
-    return Path(base) / "xdos-check"
-
-
 def _venv_python(spec: str) -> Path | None:
-    """Vrátí interpret venv s pinovanou verzí; poprvé ho vytvoří."""
-    venv = _cache_root() / hashlib.sha256(spec.encode()).hexdigest()[:16]
+    """Interpret venv s pinovanou verzí; poprvé ho vytvoří."""
+    base = os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")
+    venv = Path(base) / "xdos-check" / hashlib.sha256(spec.encode()).hexdigest()[:16]
     python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     if python.exists():
         return python
@@ -69,9 +64,16 @@ def _venv_python(spec: str) -> Path | None:
 
 def _command() -> tuple[list[str], str | None] | None:
     """(příkaz, pracovní adresář) pro spuštění kontroly, nebo None."""
-    checkout = os.environ.get(CHECKER_ENV_VAR)
+    checkout = os.environ.get("XDOS_CHECKER_PATH")
     if checkout:
-        return [sys.executable, "-m", "packages.ust_format_checker.firmware"], checkout
+        # z checkoutu běží kontrola v interpretu PlatformIO a ten PyYAML mít nemusí; bez téhle
+        # hlášky skončí chybějící závislost stejným návratovým kódem jako chyba formátu, takže
+        # by hook mlčel a v logu zbyl jen traceback
+        if subprocess.run([sys.executable, "-c", "import yaml"], capture_output=True).returncode:
+            print(f"xdos-check: {sys.executable} nemá PyYAML, kontrola se přeskočila")
+            print("xdos-check: u PlatformIO z pipx ho doplní: pipx inject platformio pyyaml")
+            return None
+        return [sys.executable, "-m", CHECKOUT_ENTRY_POINT], checkout
 
     spec = _pinned_spec()
     if spec is None:
@@ -80,7 +82,7 @@ def _command() -> tuple[list[str], str | None] | None:
     python = _venv_python(spec)
     if python is None:
         return None
-    return [str(python), "-m", "ust_format_checker.firmware"], None
+    return [str(python), "-m", ENTRY_POINT], None
 
 
 def _run(elf: Path) -> None:
@@ -93,27 +95,25 @@ def _run(elf: Path) -> None:
     if resolved is None:
         return
     command, cwd = resolved
-
-    work_dir = Path(env.subst("$BUILD_DIR")) / "xdos"  # noqa: F821
-    command += [
-        str(elf),
-        "--board", str(BOARD),
-        "--scenario", str(SCENARIO),
-        "--work-dir", str(work_dir),
-        "--cache", str(work_dir / "last.json"),
-    ]
-    if GOLDEN.exists():
-        command += ["--golden", str(GOLDEN)]
-
-    finished = subprocess.run(command, cwd=cwd, text=True)
-    if finished.returncode not in (0, 1):
-        print("xdos-check: kontrola neproběhla, viz výpis výše")
+    build_dir = Path(env.subst("$BUILD_DIR"))  # noqa: F821
+    # nálezy jdou na stdout a tečou rovnou ven; stderr držíme, aby se dalo poznat, že verze
+    # v checker.txt je starší než tenhle hook - jinak z toho vypadne jen hláška Pythonu
+    finished = subprocess.run(command + [str(PROJECT), str(build_dir), str(elf)],
+                              cwd=cwd, text=True, stderr=subprocess.PIPE)
+    problem = (finished.stderr or "").strip()
+    if not problem:
+        return
+    if "No module named" in problem:
+        print(f"xdos-check: pinovaná verze v {PIN.name} je starší než tenhle hook "
+              "a kontrolu neumí spustit - aktualizuj pin")
+    else:
+        print(problem)
 
 
 def after_build(source, target, env):  # noqa: ARG001 - podpis vyžaduje SCons
     # SCons předává cestu relativní k projektu, checker běží jinde
     elf = Path(str(target[0]))
-    _run(elf if elf.is_absolute() else Path(env.subst("$PROJECT_DIR")) / elf)
+    _run(elf if elf.is_absolute() else PROJECT / elf)
 
 
 def before_upload(source, target, env):  # noqa: ARG001 - podpis vyžaduje SCons

@@ -5,7 +5,8 @@
 device: AIRDOS03B
 mcu: atmega1284
 f_cpu: 8000000
-millis_symbol: timer0_millis
+millis_symbol: timer0_millis   # čítač, kterým se řídí délka měřicího bloku
+seconds_symbol: rtc_seconds    # hodiny zařízení, tikají po 1PPS - posouvají se spolu s millis
 
 parts:
   - component: i2c_eeprom
