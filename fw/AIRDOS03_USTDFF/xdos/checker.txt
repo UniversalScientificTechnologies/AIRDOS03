@@ -1,1 +1,1 @@
-ust-format-checker==0.1.1
+ust-format-checker==0.1.2
