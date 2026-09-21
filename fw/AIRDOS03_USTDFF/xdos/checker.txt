@@ -1,4 +1,1 @@
-# Verze kontroly formátu.
-# Commit, ne větev: pohyblivá ref znamená, že se kontrola může změnit pod rukama.
-# Dokud balíček žije v privátním DOSPORTAL, potřebuje instalace přístup k tomu repozitáři.
-ust-format-checker @ git+https://github.com/UniversalScientificTechnologies/DOSPORTAL@e02e846519c6633abac0befaa9232165296cc37f#subdirectory=backend/packages/ust_format_checker
+ust-format-checker==0.1.1

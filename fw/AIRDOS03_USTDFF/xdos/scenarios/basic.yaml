@@ -1,8 +1,8 @@
-# Výchozí scénář. Když zařízení žádný scénář nemá, vygeneruje se z osazení desky stejně
-# jako tenhle - viz default_scenario() ve scenario.py.
+# Default scenario. A device without any scenario gets one generated from its board layout,
+# the same way this one looks - see default_scenario() in scenario.py.
 
 name: basic
-stop_blocks: 2
+stop_blocks: 4
 
 sensors:
   sht31:

@@ -1,24 +1,24 @@
-# Model desky, jak ji vidí MCU: co je na které I2C adrese a na kterém pinu. Analogová část se
-# nesimuluje, model dodává rovnou hodnoty z ADC. Součástky popisuje balíček ust_format_checker
-# (components/), tady se jen osazují.
+# The board as the MCU sees it: what sits at which I2C address and on which pin. The analog
+# part is not simulated, the model supplies ADC values directly. Components themselves are
+# described by the ust_format_checker package (components/); here they are only populated.
 
 device: AIRDOS03B
 mcu: atmega1284
 f_cpu: 8000000
-millis_symbol: timer0_millis   # čítač, kterým se řídí délka měřicího bloku
-seconds_symbol: rtc_seconds    # hodiny zařízení, tikají po 1PPS - posouvají se spolu s millis
+millis_symbol: timer0_millis   # counter that paces the length of a measurement block
+seconds_symbol: rtc_seconds    # device clock, ticks on 1PPS - moves together with millis
 
 parts:
   - component: i2c_eeprom
     addr: 0x5B
-    note: sériové číslo analogové části, 16 B od offsetu 0x0800
+    note: serial number of the analog part, 16 B at offset 0x0800
     params:
       offset: "0800"
       data: "00112233445566778899AABBCCDDEEFF"
 
   - component: i2c_eeprom
     addr: 0x53
-    note: konfigurace ADC, 2 B od offsetu 0x0000
+    note: ADC configuration, 2 B at offset 0x0000
     params:
       offset: "0000"
       data: "0A05"

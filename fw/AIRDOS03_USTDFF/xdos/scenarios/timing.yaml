@@ -1,0 +1,19 @@
+# Longer run aimed at timing behaviour: spacing of measurement blocks and the period of
+# status messages. Eight blocks is the minimum for at least two $ENV messages to appear
+# after synchronisation (the firmware emits them every 30 s) so their spacing can be compared.
+
+name: timing
+stop_blocks: 8
+
+sensors:
+  sht31:
+    temp_c: rand(-40, 85)
+    humidity: rand(0, 100)
+
+events:
+  at: 1.2
+  channels: [64, 100]
+
+gnss:
+  fix_at: 1.0
+  unix: 1789560000
