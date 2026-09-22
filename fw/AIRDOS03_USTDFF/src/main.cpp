@@ -217,7 +217,8 @@ static void unixToDateTime(uint32_t t, uint16_t &year,
 }
 
 // Snapshot current time (safe across ISR boundary).
-// tm      = current Unix time (or rtc_seconds if not yet synced)
+// tm      = device clock (rtc_seconds) - the same axis $TIME.rtc_seconds reports; a reader
+//           turns it into a calendar time using $TIME.eeprom_sync_time (or 0 if not yet synced)
 // tm_s100 = hundredths of second derived from TCNT1 since last PPS
 static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
 {
@@ -241,7 +242,7 @@ static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
   tm_s100 = (uint8_t)((uint32_t)sub * 128UL / 10000UL);
   if (tm_s100 > 99u) tm_s100 = 99u;
 
-  tm = gnss_sync_unix + (rSec - sync_rtc_seconds);
+  tm = rSec;
 }
 
 static void print2d(uint8_t v)
@@ -259,8 +260,10 @@ static void printTime()
   uint32_t sRtc  = sync_rtc_seconds;
   sei();
 
-  uint32_t cur_unix = sUnix + (rSec - sRtc);
-  uint32_t age      = rSec - sRtc;
+  // eeprom_sync_time: the Unix time at which rtc_seconds was 0, not the moment of the sync
+  uint32_t sync_time = sUnix - sRtc;
+  uint32_t cur_unix  = sync_time + rSec;
+  uint32_t age       = rSec - sRtc;
 
   uint16_t yr; uint8_t mo, dy, hh, mm, ss;
   unixToDateTime(cur_unix, yr, mo, dy, hh, mm, ss);
@@ -268,7 +271,7 @@ static void printTime()
   Serial.print("$TIME,");
   Serial.print(rSec);
   Serial.print(",");
-  Serial.print(sUnix);
+  Serial.print(sync_time);
   Serial.print(",");
   Serial.print(cur_unix);
   Serial.print(",");
