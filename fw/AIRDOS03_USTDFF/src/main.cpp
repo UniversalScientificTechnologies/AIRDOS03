@@ -504,7 +504,9 @@ void StatusOut()
       Serial.print(",");
       Serial.print(tempC,    1);
       Serial.print(",");
-      Serial.println(humidity, 1);
+      Serial.print(humidity, 1);
+      // no second env sensor and no MS5611 on this board (see xdos/board.yaml)
+      Serial.println(",NaN,NaN,NaN,NaN");
     }
   }
 }
@@ -548,6 +550,8 @@ void setup()
   printHexSN(0x5B);
   Serial.println();
 
+  Serial.println("$DATAFORMAT,VERSION_2.1");
+
   Serial.print("$ADC," ADCTYPE ",");
   printHexSN(0x5B);
   Serial.print(",");
@@ -558,7 +562,9 @@ void setup()
   Wire.requestFrom((uint8_t)0x53, (uint8_t)2);
   ADCconf1 = Wire.read();
   ADCconf2 = Wire.read();
+  if (ADCconf1 < 0x10u) Serial.print('0');
   Serial.print(ADCconf1, HEX);
+  if (ADCconf2 < 0x10u) Serial.print('0');
   Serial.println(ADCconf2, HEX);
 
   Serial.println("#Hmmm...");

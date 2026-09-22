@@ -1,0 +1,33 @@
+# The board as the MCU sees it: what sits at which I2C address and on which pin. The analog
+# part is not simulated, the model supplies ADC values directly. Components themselves are
+# described by the ust_format_checker package (components/); here they are only populated.
+
+device: AIRDOS03B
+mcu: atmega1284
+f_cpu: 8000000
+millis_symbol: timer0_millis   # counter that paces the length of a measurement block
+seconds_symbol: rtc_seconds    # device clock, ticks on 1PPS - moves together with millis
+
+parts:
+  - component: i2c_eeprom
+    addr: 0x5B
+    note: serial number of the analog part, 16 B at offset 0x0800
+    params:
+      offset: "0800"
+      data: "00112233445566778899AABBCCDDEEFF"
+
+  - component: i2c_eeprom
+    addr: 0x53
+    note: ADC configuration, 2 B at offset 0x0000
+    params:
+      offset: "0000"
+      data: "0A05"
+
+  - component: sht31
+    addr: 0x45
+
+  - component: spi_adc_pulse
+    pins: {conv: PB0, reset: PC2}
+
+  - component: gnss
+    pins: {pps: PD4}
