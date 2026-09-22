@@ -548,6 +548,8 @@ void setup()
   printHexSN(0x5B);
   Serial.println();
 
+  Serial.println("$DATAFORMAT,VERSION_2.1");
+
   Serial.print("$ADC," ADCTYPE ",");
   printHexSN(0x5B);
   Serial.print(",");
