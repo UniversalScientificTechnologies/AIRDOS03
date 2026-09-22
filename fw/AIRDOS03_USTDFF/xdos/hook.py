@@ -9,6 +9,8 @@ venv, calls the package - everything else lives in ust_format_checker.platformio
 
 import hashlib
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -33,13 +35,39 @@ def _pinned_spec() -> str | None:
     return next((line for line in lines if line and not line.startswith("#")), None)
 
 
+def _pinned_version(spec: str) -> str | None:
+    match = re.fullmatch(r"[\w.-]+==([\w.+-]+)", spec)
+    return match.group(1) if match else None
+
+
+def _installed_version(python: Path) -> str | None:
+    result = subprocess.run(
+        [str(python), "-c",
+         "from importlib.metadata import version, PackageNotFoundError\n"
+         "try:\n    print(version('ust-format-checker'))\n"
+         "except PackageNotFoundError:\n    pass"],
+        capture_output=True, text=True,
+    )
+    return result.stdout.strip() or None
+
+
 def _venv_python(spec: str) -> Path | None:
-    """Interpreter of the venv holding the pinned version; created on first use."""
+    """Interpreter of the venv holding the pinned version; created on first use.
+
+    A stale or half-installed venv (e.g. a previous install that timed out) is not enough to
+    trust - the installed version is checked against the pin, and rebuilt on a mismatch.
+    """
     base = os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")
     venv = Path(base) / "xdos-check" / hashlib.sha256(spec.encode()).hexdigest()[:16]
     python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    wanted = _pinned_version(spec)
     if python.exists():
-        return python
+        installed = _installed_version(python)
+        if installed is not None and (wanted is None or installed == wanted):
+            return python
+        print(f"xdos-check: cached install is broken or stale (have {installed}, "
+              f"want {wanted or spec}), reinstalling")
+        shutil.rmtree(venv, ignore_errors=True)
 
     print(f"xdos-check: installing {spec.split('@')[0].strip()} (one-off, takes a moment)")
     try:

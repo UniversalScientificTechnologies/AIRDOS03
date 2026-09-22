@@ -14,7 +14,6 @@ model in [board.yaml](board.yaml), and its output is checked to still conform to
 | [scenarios/basic.yaml](scenarios/basic.yaml) | what the simulation feeds the firmware (events, sensors, GNSS) |
 | [checker.txt](checker.txt) | pinned version of the checker |
 | [hook.py](hook.py) | wiring into PlatformIO (build and upload) |
-| [golden/basic.txt](golden/basic.txt) | reference capture backward compatibility is measured against |
 | [../xdos_check.ini](../xdos_check.ini) | extra config that turns the hook on |
 
 The checks themselves, the format schema and the component models live in the
@@ -43,6 +42,10 @@ XDOS_CHECK=0 pio run -c xdos_check.ini -e TFUNIPAYLOAD01_uart   # check disabled
 
 [.github/workflows/xdos_check.yml](../../../.github/workflows/xdos_check.yml) runs the same
 check on every PR to `AIRDOS03B` and on every push to `AIRDOS03B`.
+
+Findings are emitted as GitHub annotations, so they show up on the run page and in the PR
+check box without opening the log. The full report goes to the run summary, and the
+simulation capture is kept as an artifact.
 
 In CI the checker version is the one from [checker.txt](checker.txt) as well, so it matches
 what you have on your desk.
@@ -75,15 +78,10 @@ Three levels:
 - **warning** — worth attention, for example when DOSPORTAL silently drops a line,
 - **info** — an observation, such as a new message or a field appended at the end.
 
-An intentional format change is confirmed by storing a new reference capture:
-
-```bash
-~/.cache/xdos-check/*/bin/xdos-check-firmware .pio/build/TFUNIPAYLOAD01_uart/firmware.elf \
-    --board xdos/board.yaml --scenario xdos/scenarios/basic.yaml \
-    --golden xdos/golden/basic.txt --accept
-```
-
-The new capture is then committed, and the format change shows up in the PR as a readable diff.
+An intentional format change goes through the format itself, not through this repository:
+describe the field in the format documentation, add it to `messages.yaml` in the checker and
+release a new version, then teach dosview and the DOSPORTAL parser to read it. Until all of
+that has happened the finding stands, because until then the new data reaches nobody.
 
 ## Writing a scenario
 
