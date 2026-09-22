@@ -38,6 +38,8 @@ pio run -c xdos_check.ini -e TFUNIPAYLOAD01_uart -t upload  # before an upload a
 XDOS_CHECK=0 pio run -c xdos_check.ini -e TFUNIPAYLOAD01_uart   # check disabled
 ```
 
+What the simulated firmware printed lands in `.pio/build/TFUNIPAYLOAD01_uart/xdos/capture.txt`.
+
 ## In CI
 
 [.github/workflows/xdos_check.yml](../../../.github/workflows/xdos_check.yml) runs the same
