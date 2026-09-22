@@ -562,7 +562,9 @@ void setup()
   Wire.requestFrom((uint8_t)0x53, (uint8_t)2);
   ADCconf1 = Wire.read();
   ADCconf2 = Wire.read();
+  if (ADCconf1 < 0x10u) Serial.print('0');
   Serial.print(ADCconf1, HEX);
+  if (ADCconf2 < 0x10u) Serial.print('0');
   Serial.println(ADCconf2, HEX);
 
   Serial.println("#Hmmm...");
