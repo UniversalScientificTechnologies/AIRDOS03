@@ -382,6 +382,14 @@ static void readNMEA()
 // EEPROM serial-number helper
 // ===========================================================================
 
+// The format wants hex in lowercase; Serial.print(b, HEX) prints uppercase.
+static void printHexByte(uint8_t b)
+{
+  static const char digits[] = "0123456789abcdef";
+  Serial.print(digits[b >> 4]);
+  Serial.print(digits[b & 0x0f]);
+}
+
 static void printHexSN(uint8_t eepromAddr)
 {
   Wire.beginTransmission(eepromAddr);
@@ -391,9 +399,7 @@ static void printHexSN(uint8_t eepromAddr)
   Wire.requestFrom(eepromAddr, (uint8_t)16);
   for (uint8_t i = 0; i < 16u; i++)
   {
-    uint8_t b = Wire.read();
-    if (b < 0x10u) Serial.print('0');
-    Serial.print(b, HEX);
+    printHexByte(Wire.read());
   }
 }
 
@@ -476,8 +482,11 @@ static inline void flushDataOut()
   digitalWrite(LED2, LOW);
 }
 
+// $ENV belongs to the block whose $STOP came last (DataOut() has already bumped count).
 void StatusOut()
 {
+  if (count == 0) return;   // no block has ended yet
+
   uint32_t tm; uint8_t tm_s100;
   getCurrentTime(tm, tm_s100);
 
@@ -499,7 +508,7 @@ void StatusOut()
       float humidity = 100.0f * ((float)rh_raw / 65535.0f);
 
       Serial.print("$ENV,");
-      Serial.print(count);
+      Serial.print(count - 1);
       Serial.print(",");
       Serial.print(tm);
       Serial.print(".");
@@ -565,14 +574,11 @@ void setup()
   Wire.requestFrom((uint8_t)0x53, (uint8_t)2);
   ADCconf1 = Wire.read();
   ADCconf2 = Wire.read();
-  if (ADCconf1 < 0x10u) Serial.print('0');
-  Serial.print(ADCconf1, HEX);
-  if (ADCconf2 < 0x10u) Serial.print('0');
-  Serial.println(ADCconf2, HEX);
+  printHexByte(ADCconf1);
+  printHexByte(ADCconf2);
+  Serial.println();
 
   Serial.println("#Hmmm...");
-
-  StatusOut();
 
   digitalWrite(LED1, LOW);
   digitalWrite(LED2, LOW);
