@@ -14,7 +14,7 @@ parts:
     note: serial number of the analog part, 16 B at offset 0x0800
     params:
       offset: "0800"
-      data: "00112233445566778899AABBCCDDEEFF"
+      data: "00112233445566778899aabbccddeeff"
 
   - component: i2c_eeprom
     addr: 0x53
