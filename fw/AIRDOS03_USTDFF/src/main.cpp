@@ -286,6 +286,19 @@ static void printTime()
   Serial.println();
 }
 
+static void printRtcChk()
+{
+  uint32_t tm; uint8_t tm_s100;
+  getCurrentTime(tm, tm_s100);
+
+  Serial.print("$RTCCHK,");
+  Serial.print(tm);
+  Serial.print(".");
+  Serial.print(tm_s100);
+  Serial.print(gnss_synced ? ",OK" : ",INIT");
+  Serial.println(",reg07=0x00,reg28=0x00");
+}
+
 // ===========================================================================
 // NMEA parser  (non-blocking, called from loop)
 // ===========================================================================
@@ -344,6 +357,10 @@ static void processNMEA()
   sync_rtc_seconds  = rtc_seconds;
   gnss_synced       = true;
   sei();
+
+  // The time stops being relative only with the first fix
+  if (first_sync)
+    printRtcChk();
 
   // Emit $TIME on first fix or after fix was lost
   if (first_sync || !was_synced)
@@ -577,6 +594,8 @@ void setup()
   printHexByte(ADCconf1);
   printHexByte(ADCconf2);
   Serial.println();
+
+  printRtcChk();
 
   Serial.println("#Hmmm...");
 
