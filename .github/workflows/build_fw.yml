@@ -2,6 +2,8 @@ name: Build firmware
 
 on:
   push:
+    branches:
+      - AIRDOS03B
     paths:
       - 'fw/**'
       - '.github/workflows/*.yml'
@@ -20,6 +22,12 @@ on:
       build_type:
         required: false
         type: string
+
+# One run per branch or pull request at a time
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   load-matrix:
     runs-on: ubuntu-latest
@@ -143,6 +151,15 @@ jobs:
             root
           retention-days: 1
 
+      # reused in other workflows
+      - name: Store ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: elf_${{ matrix.type }}_${{ matrix.name }}
+          path: fw/${{ matrix.type }}/.pio/build/${{ matrix.env }}/firmware.elf
+          retention-days: 1
+          if-no-files-found: error
+
   commit:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
@@ -161,6 +178,7 @@ jobs:
       - name: Download a Build Artifact
         uses: actions/download-artifact@v4
         with:
+          pattern: fw_*
           path: 'fw/artifacts/'
 
       - name: Update git hash
