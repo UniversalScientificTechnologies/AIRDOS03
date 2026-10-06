@@ -9,13 +9,13 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-"XSTR(GHBUILDTYPE);
+String FWversion = XSTR(MAJOR) "." XSTR(MINOR) "." XSTR(GHRELEASE) "-" XSTR(GHBUILD) "-" XSTR(GHBUILDTYPE);
 
 // ADC values below THRESHOLD go to the histogram.
 // Values >= THRESHOLD are recorded as individual $E events.
 // MAX_EVENTS sized against the ATmega1284P's 16 KB SRAM: each slot costs
-// 4 bytes (event_time + event_channel), so 1000 slots is 4000 bytes — about
-// a quarter of SRAM — leaving most of it free for the stack while covering
+// 6 bytes (event_time + event_channel), so 1000 slots is 6000 bytes — a bit
+// over a third of SRAM — leaving most of it free for the stack while covering
 // well over the previous 300-event/10 s (30 Hz) cap. Above-threshold events
 // beyond this cap are still dropped (events_counter keeps counting the true
 // total; dosview detects and warns about the shortfall).
@@ -63,10 +63,15 @@ TX1/INT1 (D 11) PD3  |        | PC2 (D 18) TCK
 // Measurement buffers  (written from main-loop ADC polling)
 // ---------------------------------------------------------------------------
 uint16_t          histogram[THRESHOLD];
-volatile uint16_t event_time[MAX_EVENTS];
+volatile uint32_t event_time[MAX_EVENTS];      // ticks since block start
 volatile uint16_t event_channel[MAX_EVENTS];
 volatile uint16_t events_counter = 0;
 volatile uint16_t startSystime   = 0;
+
+// TCNT1 wraps every 8.39 s, i.e. inside one 10 s block, so event times are kept
+// on a 32-bit tick axis: timer1_high counts the TCNT1 overflows.
+uint16_t timer1_high     = 0;
+uint32_t blockStartTicks = 0;           // ticks32() at block start
 
 // ---------------------------------------------------------------------------
 // Time-keeping
@@ -116,11 +121,23 @@ ISR(PCINT3_vect)
 // ADC CONV polling on PB0
 // High CONV level means ADC conversion ready — read value via raw SPI.
 // ===========================================================================
+static inline uint32_t ticks32()
+{
+  uint16_t lo = TCNT1;
+  if (TIFR1 & (1 << TOV1))
+  {
+    TIFR1 = (1 << TOV1);            // clear by writing 1
+    timer1_high++;
+    lo = TCNT1;                     // re-read: lo may predate the overflow
+  }
+  return ((uint32_t)timer1_high << 16) | lo;
+}
+
 static inline void serviceADC()
 {
-  if (!(PINB & (1 << 0))) return;   // ignore falling edge
+  uint32_t timestamp = ticks32();
 
-  uint16_t timestamp = TCNT1;
+  if (!(PINB & (1 << 0))) return;   // ignore falling edge
 
   PORTC &= ~(1 << 2);               // DRESET LOW  (PC2)
 
@@ -144,7 +161,7 @@ static inline void serviceADC()
   {
     if (events_counter < MAX_EVENTS)
     {
-      event_time[events_counter]    = timestamp;
+      event_time[events_counter]    = timestamp - blockStartTicks;
       event_channel[events_counter] = adcVal;
     }
     events_counter++;
@@ -217,7 +234,8 @@ static void unixToDateTime(uint32_t t, uint16_t &year,
 }
 
 // Snapshot current time (safe across ISR boundary).
-// tm      = current Unix time (or rtc_seconds if not yet synced)
+// tm      = device clock (rtc_seconds) - the same axis $TIME.rtc_seconds reports; a reader
+//           turns it into a calendar time using $TIME.eeprom_sync_time (or 0 if not yet synced)
 // tm_s100 = hundredths of second derived from TCNT1 since last PPS
 static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
 {
@@ -241,7 +259,7 @@ static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
   tm_s100 = (uint8_t)((uint32_t)sub * 128UL / 10000UL);
   if (tm_s100 > 99u) tm_s100 = 99u;
 
-  tm = gnss_sync_unix + (rSec - sync_rtc_seconds);
+  tm = rSec;
 }
 
 static void print2d(uint8_t v)
@@ -259,8 +277,10 @@ static void printTime()
   uint32_t sRtc  = sync_rtc_seconds;
   sei();
 
-  uint32_t cur_unix = sUnix + (rSec - sRtc);
-  uint32_t age      = rSec - sRtc;
+  // eeprom_sync_time: the Unix time at which rtc_seconds was 0, not the moment of the sync
+  uint32_t sync_time = sUnix - sRtc;
+  uint32_t cur_unix  = sync_time + rSec;
+  uint32_t age       = rSec - sRtc;
 
   uint16_t yr; uint8_t mo, dy, hh, mm, ss;
   unixToDateTime(cur_unix, yr, mo, dy, hh, mm, ss);
@@ -268,7 +288,7 @@ static void printTime()
   Serial.print("$TIME,");
   Serial.print(rSec);
   Serial.print(",");
-  Serial.print(sUnix);
+  Serial.print(sync_time);
   Serial.print(",");
   Serial.print(cur_unix);
   Serial.print(",");
@@ -281,6 +301,19 @@ static void printTime()
   print2d(mm);        Serial.print(':');
   print2d(ss);
   Serial.println();
+}
+
+static void printRtcChk()
+{
+  uint32_t tm; uint8_t tm_s100;
+  getCurrentTime(tm, tm_s100);
+
+  Serial.print("$RTCCHK,");
+  Serial.print(tm);
+  Serial.print(".");
+  Serial.print(tm_s100);
+  Serial.print(gnss_synced ? ",OK" : ",INIT");
+  Serial.println(",reg07=0x00,reg28=0x00");
 }
 
 // ===========================================================================
@@ -342,6 +375,10 @@ static void processNMEA()
   gnss_synced       = true;
   sei();
 
+  // The time stops being relative only with the first fix
+  if (first_sync)
+    printRtcChk();
+
   // Emit $TIME on first fix or after fix was lost
   if (first_sync || !was_synced)
     printTime();
@@ -379,6 +416,14 @@ static void readNMEA()
 // EEPROM serial-number helper
 // ===========================================================================
 
+// The format wants hex in lowercase; Serial.print(b, HEX) prints uppercase.
+static void printHexByte(uint8_t b)
+{
+  static const char digits[] = "0123456789abcdef";
+  Serial.print(digits[b >> 4]);
+  Serial.print(digits[b & 0x0f]);
+}
+
 static void printHexSN(uint8_t eepromAddr)
 {
   Wire.beginTransmission(eepromAddr);
@@ -388,9 +433,7 @@ static void printHexSN(uint8_t eepromAddr)
   Wire.requestFrom(eepromAddr, (uint8_t)16);
   for (uint8_t i = 0; i < 16u; i++)
   {
-    uint8_t b = Wire.read();
-    if (b < 0x10u) Serial.print('0');
-    Serial.print(b, HEX);
+    printHexByte(Wire.read());
   }
 }
 
@@ -462,7 +505,8 @@ static inline void flushDataOut()
   memset((void*)event_time,    0, sizeof(event_time));
   memset((void*)event_channel, 0, sizeof(event_channel));
   events_counter = 0;
-  startSystime   = TCNT1;
+  blockStartTicks = ticks32();
+  startSystime    = (uint16_t)blockStartTicks;
 
   // Re-arm peak detector
   digitalWrite(DSET,   HIGH);
@@ -473,8 +517,11 @@ static inline void flushDataOut()
   digitalWrite(LED2, LOW);
 }
 
+// $ENV belongs to the block whose $STOP came last (DataOut() has already bumped count).
 void StatusOut()
 {
+  if (count == 0) return;   // no block has ended yet
+
   uint32_t tm; uint8_t tm_s100;
   getCurrentTime(tm, tm_s100);
 
@@ -496,7 +543,7 @@ void StatusOut()
       float humidity = 100.0f * ((float)rh_raw / 65535.0f);
 
       Serial.print("$ENV,");
-      Serial.print(count);
+      Serial.print(count - 1);
       Serial.print(",");
       Serial.print(tm);
       Serial.print(".");
@@ -505,8 +552,7 @@ void StatusOut()
       Serial.print(tempC,    1);
       Serial.print(",");
       Serial.print(humidity, 1);
-      // no second env sensor and no MS5611 on this board (see xdos/board.yaml)
-      Serial.println(",NaN,NaN,NaN,NaN");
+      Serial.println();
     }
   }
 }
@@ -562,14 +608,13 @@ void setup()
   Wire.requestFrom((uint8_t)0x53, (uint8_t)2);
   ADCconf1 = Wire.read();
   ADCconf2 = Wire.read();
-  if (ADCconf1 < 0x10u) Serial.print('0');
-  Serial.print(ADCconf1, HEX);
-  if (ADCconf2 < 0x10u) Serial.print('0');
-  Serial.println(ADCconf2, HEX);
+  printHexByte(ADCconf1);
+  printHexByte(ADCconf2);
+  Serial.println();
+
+  printRtcChk();
 
   Serial.println("#Hmmm...");
-
-  StatusOut();
 
   digitalWrite(LED1, LOW);
   digitalWrite(LED2, LOW);
@@ -582,7 +627,8 @@ void setup()
 
   lastDataOutMs = millis();
   lastStatusMs  = millis();
-  startSystime  = TCNT1;
+  blockStartTicks = ticks32();
+  startSystime    = (uint16_t)blockStartTicks;
 }
 
 // ===========================================================================

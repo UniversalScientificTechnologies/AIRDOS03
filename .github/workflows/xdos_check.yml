@@ -1,36 +1,10 @@
 name: Check output format
 
-# Builds the firmware, runs it in simulation (simavr) and checks that its output still
-# conforms to the UST Dosimeters File Format.
-
-# Deliberately kept out of build_fw.yml: that one is invoked through workflow_call when
-# releasing, and until the checker package is stable it must not be able to block a release.
-
 on:
-  pull_request:
-    branches:
-      - AIRDOS03B
-    paths:
-      - 'fw/**'
-      - '.github/workflows/xdos_check.yml'
-      - '!fw/build/**'
-      - '!fw/**/src/githash.h'
-      - '!fw/**/nextversion'
-  push:
-    branches:
-      - AIRDOS03B
-    paths:
-      - 'fw/**'
-      - '.github/workflows/xdos_check.yml'
-      - '!fw/build/**'
-      - '!fw/**/src/githash.h'
-      - '!fw/**/nextversion'
-  workflow_dispatch:
+  workflow_call:
 
-# run only on the lastest commit
-concurrency:
-  group: xdos-check-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
 
 env:
   FORCE_COLOR: '1'
@@ -75,9 +49,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.pat }}
 
       - uses: actions/setup-python@v5
         with:
@@ -86,52 +57,56 @@ jobs:
       - name: Simulator
         run: sudo apt-get update && sudo apt-get install -y simavr libsimavr-dev libelf-dev
 
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: ~/.platformio
-          key: pio-${{ runner.os }}-${{ hashFiles(format('{0}/platformio.ini', env.PROJECT_DIR)) }}
-          restore-keys: pio-${{ runner.os }}-
-
       - name: Install required tools
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install platformio pytest
+          python3 -m pip install pytest
           python3 -m pip install -r "${PROJECT_DIR}/xdos/checker.txt"
 
-      - name: Build FW
-        run: python3 -m platformio run -d "${PROJECT_DIR}" -e "${{ matrix.env }}"
+      # lands where a local build would put it, so the checker and the tests find it on their own
+      - name: Firmware built by this run
+        uses: actions/download-artifact@v4
+        with:
+          name: elf_${{ matrix.type }}_${{ matrix.name }}
+          path: ${{ env.BUILD_DIR }}
 
       - name: Check UST format
-        id: check
         run: |
           set -o pipefail
           python3 -m ust_format_checker.platformio --ci \
             "${PROJECT_DIR}" "${BUILD_DIR}" "${BUILD_DIR}/firmware.elf" \
-            | tee xdos-report.txt
+            | tee xdos-findings.txt
 
       - name: Run device specific tests
         if: always() && hashFiles(format('{0}/xdos/tests/test_*.py', env.PROJECT_DIR)) != ''
-        run: python3 -m pytest "${PROJECT_DIR}/xdos/tests" -v -ra
-
-      - name: Report into PR summary
-        if: always() && hashFiles('xdos-report.txt') != ''
         run: |
-          {
-            echo "## ${{ matrix.type }}"
-            echo '```'
-            sed -e 's/\x1b\[[0-9;]*m//g' xdos-report.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          python3 -m pytest "${PROJECT_DIR}/xdos/tests" -v -ra | tee xdos-tests.txt
 
-      - name: Simulation output
-        if: always()
+      - name: Compose report
+        if: always() && hashFiles('xdos-findings.txt') != ''
+        run: |
+          python3 .github/scripts/xdos_report.py "${{ matrix.type }}" \
+            "${PROJECT_DIR}" "${BUILD_DIR}" xdos-findings.txt xdos-tests.txt > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report for the release job
+        if: always() && hashFiles('report.md') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: xdos-${{ matrix.type }}
+          name: xdos-report-${{ matrix.type }}
+          path: report.md
+          retention-days: 1
+
+      - name: Simulation output of a failed check
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdos-debug-${{ matrix.type }}
           path: |
             ${{ env.BUILD_DIR }}/xdos/capture.txt
             ${{ env.BUILD_DIR }}/xdos/run.scenario
-            xdos-report.txt
-          retention-days: 14
+            xdos-findings.txt
+            xdos-tests.txt
+          retention-days: 7
           if-no-files-found: ignore
