@@ -534,6 +534,7 @@ void StatusOut()
       Serial.print(tempC,    1);
       Serial.print(",");
       Serial.print(humidity, 1);
+      Serial.print("\n");
     }
   }
 }
