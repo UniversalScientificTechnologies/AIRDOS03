@@ -534,8 +534,6 @@ void StatusOut()
       Serial.print(tempC,    1);
       Serial.print(",");
       Serial.print(humidity, 1);
-      // no second env sensor and no MS5611 on this board (see xdos/board.yaml)
-      Serial.println(",NaN,NaN,NaN,NaN");
     }
   }
 }
