@@ -41,6 +41,14 @@ jobs:
           name: fw_${{ matrix.type }}_${{ matrix.name }}
           path: artifact
 
+      # only firmware with a format check has one (see xdos_check.yml)
+      - name: Download format verification report
+        uses: actions/download-artifact@v4
+        with:
+          pattern: xdos-report-${{ matrix.type }}
+          merge-multiple: true
+          path: report
+
       - name: Gen release name
         id: gen_release_name
         env:
@@ -72,18 +80,35 @@ jobs:
           echo "tagname=${FW_TYPE}-${VERSION}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+      - name: Release notes
+        env:
+          TAGNAME: ${{ steps.gen_release_name.outputs.tagname }}
+          VERSION: ${{ steps.gen_release_name.outputs.version }}
+        run: |
+          {
+            echo "Pre-release (BETA) of firmware \`${{ matrix.type }}\` (\`${{ matrix.name }}\`)"
+            echo
+            echo "* version: \`${VERSION}\`"
+            echo "* PlatformIO env: \`${{ matrix.env }}\`"
+            echo "* commit: ${{ github.sha }}"
+            if [ -f report/report.md ]; then
+              echo
+              cat report/report.md
+            fi
+          } > release-notes.md
+          if [ -f report/report.md ]; then
+            cp report/report.md "${TAGNAME}-ust-format-report.md"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.gen_release_name.outputs.tagname }}
           target_commitish: ${{ github.sha }}
           name: BETA ${{ steps.gen_release_name.outputs.tagname }}
-          body: |
-            Pre-release (BETA) of firmware `${{ matrix.type }}` (`${{ matrix.name }}`)
-
-            * version: `${{ steps.gen_release_name.outputs.version }}`
-            * PlatformIO env: `${{ matrix.env }}`
-            * commit: ${{ github.sha }}
+          body_path: release-notes.md
           draft: false
           prerelease: true
-          files: artifact/fw/build/fw_${{ matrix.type }}_${{ matrix.name }}.hex
+          files: |
+            artifact/fw/build/fw_${{ matrix.type }}_${{ matrix.name }}.hex
+            ${{ steps.gen_release_name.outputs.tagname }}-ust-format-report.md

@@ -160,10 +160,14 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  format-check:
+    needs: [build]
+    uses: ./.github/workflows/xdos_check.yml
+
   commit:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, format-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
