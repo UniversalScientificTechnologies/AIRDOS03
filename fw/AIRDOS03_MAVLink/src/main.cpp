@@ -189,6 +189,9 @@ static uint32_t nmeaToUnix(uint8_t day, uint8_t month, uint8_t year2,
        + sec;
 }
 
+// tm      = device clock (rtc_seconds) - the same axis TIMESYNC.rtc_seconds reports; a reader
+//           turns it into a calendar time using TIMESYNC (0 if not yet synced)
+// tm_s100 = hundredths of second derived from TCNT1 since last PPS
 static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
 {
   if (!gnss_synced)
@@ -205,7 +208,7 @@ static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
   uint16_t sub = tc1 - pps;
   tm_s100 = (uint8_t)((uint32_t)sub * 128UL / 10000UL);
   if (tm_s100 > 99u) tm_s100 = 99u;
-  tm = gnss_sync_unix + (rSec - sync_rtc_seconds);
+  tm = rSec;
 }
 
 // ===========================================================================

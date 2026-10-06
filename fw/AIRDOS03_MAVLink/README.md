@@ -151,7 +151,7 @@ Sent after events, before histogram packets (`$STOP` header fields).
 Offset  Size  Field
   0      1    sub_type        = 0x04
   1      2    count           // same cycle index as START
-  3      4    tm              // Unix time at end of window (0 if not synced)
+  3      4    tm              // device clock (rtc_seconds) at end of window (0 if not synced)
   7      1    tm_s100         // hundredths of second (0–99)
   8      2    stop_systime    // TCNT1 at end of window
  10      2    events_total    // total events_counter (may exceed MAX_EVENTS)
@@ -213,7 +213,7 @@ Sent every 30 s once the first measurement cycle has ended (`$ENV`).
 Offset  Size  Field
   0      1    sub_type        = 0x08
   1      2    count           // index of the cycle whose STOP came last
-  3      4    tm              // Unix time (0 if not synced)
+  3      4    tm              // device clock (rtc_seconds) (0 if not synced)
   7      1    tm_s100         // hundredths of second
   8      1    reserved
   9      4    temperature     // float32, °C (IEEE 754 single, little-endian)
