@@ -287,7 +287,7 @@ On GNSS fix or re-sync after fix loss:
 $DOS,AIRDOS03B,<major>.<minor>,0,unknown,MAVLink,<sn_hex_32chars>
 $DATAFORMAT,VERSION_<format_major>.<format_minor>
 $ADC,USTSIPIN03C,<sn_hex_32chars>,<conf1hex><conf2hex>
-$TIME,<rtc_seconds>,<gnss_sync_unix>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM:SS>
+$TIME,<rtc_seconds>,<eeprom_sync_time>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM:SS>
 $START,<count>,<start_systime>
 $E,<event_time>,<event_channel>
 $STOP,<count>,<tm>.<tm_s100>,<stop_systime>,<events_total>,<hist_0>,...,<hist_63>
@@ -297,3 +297,7 @@ $ENV,<count>,<tm>.<tm_s100>,<tempC>,<humidity>
 
 `ALIVE` is not a message of the UST format, so it is written as a debug/comment line (`#`), which
 format readers skip.
+
+`<eeprom_sync_time>` in `$TIME` is the Unix time at which `rtc_seconds` was 0, as the UST format
+defines it. The decoders compute it as `current_unix - rtc_seconds`; the TIMESYNC packet itself
+carries the moment of the GNSS sync (`gnss_sync_unix`) instead.

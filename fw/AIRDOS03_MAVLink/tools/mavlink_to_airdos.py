@@ -88,7 +88,8 @@ def parse_timesync(payload):
         return
     _, synced, rtc_sec, gnss_sync, cur_unix, age = struct.unpack_from(fmt, payload)
     dt_str = unix_to_str(cur_unix) if synced else "0000-00-00 00:00:00"
-    print(f"$TIME,{rtc_sec},{gnss_sync},{cur_unix},{age},{dt_str}")
+    sync_time = cur_unix - rtc_sec
+    print(f"$TIME,{rtc_sec},{sync_time},{cur_unix},{age},{dt_str}")
 
 
 def parse_env(payload, cycles):
