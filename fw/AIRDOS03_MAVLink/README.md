@@ -74,7 +74,7 @@ All multi-byte integers are **little-endian**.
 
 | Byte 0 | Name            | Corresponds to    | Payload size |
 |--------|-----------------|-------------------|--------------|
-| 0x01   | AIRDOS_STARTUP  | `$DOS` + `$ADC`   | 29 B         |
+| 0x01   | AIRDOS_STARTUP  | `$DOS` + `$DATAFORMAT` + `$ADC` | 29 B |
 | 0x02   | AIRDOS_TIMESYNC | `$TIME`           | 18 B         |
 | 0x03   | AIRDOS_START    | `$START`          | 5 B          |
 | 0x04   | AIRDOS_STOP     | `$STOP` header    | 14 B         |
@@ -88,22 +88,25 @@ All multi-byte integers are **little-endian**.
 
 ### 0x01 — STARTUP (29 bytes)
 
-Sent once at startup. Provides device identification (`$DOS`, `$ADC`).
+Sent once at startup. Provides device identification (`$DOS`, `$ADC`) and the version of
+the UST data format the packets are meant to be decoded into (`$DATAFORMAT`).
 
 ```
 Offset  Size  Field
   0      1    sub_type        = 0x01
   1      1    threshold       // THRESHOLD constant (64)
-  2      2    max_events      // MAX_EVENTS constant (300)
+  2      2    max_events      // MAX_EVENTS constant (1000)
   4     16    serial_number   // raw bytes from EEPROM 0x5B offset 0x0800
  20      1    adc_conf1       // from EEPROM 0x53 offset 0x0000
  21      1    adc_conf2       // from EEPROM 0x53 offset 0x0001
  22      1    fw_major        // MAJOR version
  23      1    fw_minor        // MINOR version
- 24      4    reserved        // zero
+ 24      1    format_major    // UST data format version, 2 for format 2.1
+ 25      1    format_minor    // 1 for format 2.1
+ 26      3    reserved        // zero
 ```
 
-Python: `struct.unpack_from('<BBH16sBBBB4s', payload)`
+Python: `struct.unpack_from('<BBH16sBBBBBB', payload)`
 
 ---
 
@@ -283,13 +286,14 @@ On GNSS fix or re-sync after fix loss:
 
 ```
 $DOS,AIRDOS03B,<major>.<minor>,0,unknown,MAVLink,<sn_hex_32chars>
+$DATAFORMAT,VERSION_<format_major>.<format_minor>
 $ADC,USTSIPIN03C,<sn_hex_32chars>,<conf1hex><conf2hex>
 $TIME,<rtc_seconds>,<gnss_sync_unix>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM:SS>
 $START,<count>,<start_systime>
 $E,<event_time>,<event_channel>
 $STOP,<count>,<tm>.<tm_s100>,<stop_systime>,<events_total>,<hist_0>,...,<hist_63>
 $ENV,<count>,<tm>.<tm_s100>,<tempC>,<humidity>
-$ALIVE,<uptime_s>,<count>,<cum_pulses>,<events_min>,<gnss_synced>,<sync_age>
+#ALIVE,<uptime_s>,<count>,<cum_pulses>,<events_min>,<gnss_synced>,<sync_age>
 ```
 
 `ALIVE` is not a message of the UST format, so it is written as a debug/comment line (`#`), which

@@ -6,6 +6,10 @@
 #define MINOR 3
 #include "githash.h"
 
+// Version of the UST data format 
+#define DATAFORMAT_MAJOR 2
+#define DATAFORMAT_MINOR 1
+
 // ADC values below THRESHOLD go to the histogram.
 // Values >= THRESHOLD are recorded as individual $E events.
 // MAX_EVENTS sized against the ATmega1284P's 16 KB SRAM: each slot costs
@@ -38,9 +42,12 @@ static void SendTunnelData(uint8_t *data, uint8_t len,
                            uint8_t payload_type = 4,
                            uint8_t sysid = 1, uint8_t compid = 1)
 {
+  uint8_t payload[MAVLINK_MSG_TUNNEL_FIELD_PAYLOAD_LEN] = {0};
+  memcpy(payload, data, len);
+
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_tunnel_pack(1, 10, &msg, sysid, compid, payload_type, len, data);
+  mavlink_msg_tunnel_pack(1, 10, &msg, sysid, compid, payload_type, len, payload);
   uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
   hs.write(buf, n);
 }
@@ -49,11 +56,7 @@ static void SendTunnelData(uint8_t *data, uint8_t len,
 static void SendTunnelBroadcast(uint8_t *data, uint8_t len,
                                 uint8_t payload_type = 4)
 {
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_tunnel_pack(1, 10, &msg, 0, 0, payload_type, len, data);
-  uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
-  hs.write(buf, n);
+  SendTunnelData(data, len, payload_type, 0, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -570,7 +573,9 @@ void setup()
     buf[21] = ADCconf2;
     buf[22] = fw_major;
     buf[23] = fw_minor;
-    // buf[24..28] = reserved (already zero)
+    buf[24] = DATAFORMAT_MAJOR;
+    buf[25] = DATAFORMAT_MINOR;
+    // buf[26..28] = reserved (already zero)
     SendTunnelData(buf, sizeof(buf));
   }
 

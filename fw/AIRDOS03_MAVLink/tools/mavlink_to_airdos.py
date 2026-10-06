@@ -69,13 +69,16 @@ class Cycle:
 
 
 def parse_startup(payload):
-    fmt = '<BBH16sBBBB4s'
+    fmt = '<BBH16sBBBBBB'
     if len(payload) < struct.calcsize(fmt):
         return
-    _, threshold, max_events, sn_raw, conf1, conf2, major, minor, _ = \
+    _, threshold, max_events, sn_raw, conf1, conf2, major, minor, fmt_major, fmt_minor = \
         struct.unpack_from(fmt, payload)
     sn = sn_hex(sn_raw)
     print(f"$DOS,AIRDOS03B,{major}.{minor},0,unknown,MAVLink,{sn}")
+    # firmware older than the 2.1 format leaves these bytes zero and declares no format
+    if fmt_major:
+        print(f"$DATAFORMAT,VERSION_{fmt_major}.{fmt_minor}")
     print(f"$ADC,USTSIPIN03C,{sn},{conf1:02x}{conf2:02x}")
 
 
