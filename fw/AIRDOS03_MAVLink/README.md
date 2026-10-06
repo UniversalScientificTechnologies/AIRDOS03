@@ -207,12 +207,12 @@ Python events: `struct.unpack_from(f'<{2*n}H', payload[9:9+n*4])` — pairs (tim
 
 ### 0x08 — ENV (17 bytes)
 
-Sent at startup and every 30 s (`$ENV`).
+Sent every 30 s once the first measurement cycle has ended (`$ENV`).
 
 ```
 Offset  Size  Field
   0      1    sub_type        = 0x08
-  1      2    count           // measurement cycle index
+  1      2    count           // index of the cycle whose STOP came last
   3      4    tm              // Unix time (0 if not synced)
   7      1    tm_s100         // hundredths of second
   8      1    reserved
@@ -259,7 +259,6 @@ sync_age = struct.unpack_from('<I', payload, 16)[0]
 ```
 At setup():
   STARTUP  (0x01)
-  ENV      (0x08)   ← initial sensor reading
 
 Every 10 s:
   START    (0x03)

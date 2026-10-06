@@ -237,6 +237,9 @@ static void SendTimeSync()
 // 0x08 — ENV (17 bytes)
 static void SendENV()
 {
+  if (count == 0) return;   // no block has ended yet
+
+  uint16_t block = count - 1;
   uint32_t tm; uint8_t tm_s100;
   getCurrentTime(tm, tm_s100);
 
@@ -258,7 +261,7 @@ static void SendENV()
   uint8_t reserved = 0;
   uint8_t buf[17];
   buf[0] = 0x08;
-  memcpy(buf + 1, &count,    2);
+  memcpy(buf + 1, &block,    2);
   memcpy(buf + 3, &tm,       4);
   buf[7] = tm_s100;
   buf[8] = reserved;
@@ -578,9 +581,6 @@ void setup()
     // buf[26..28] = reserved (already zero)
     SendTunnelData(buf, sizeof(buf));
   }
-
-  // Initial ENV reading
-  SendENV();
 
   digitalWrite(LED1, LOW);
   digitalWrite(LED2, LOW);
