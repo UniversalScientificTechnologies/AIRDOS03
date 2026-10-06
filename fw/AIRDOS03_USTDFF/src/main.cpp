@@ -9,13 +9,13 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-String FWversion = XSTR(MAJOR)"."XSTR(MINOR)"."XSTR(GHRELEASE)"-"XSTR(GHBUILD)"-"XSTR(GHBUILDTYPE);
+String FWversion = XSTR(MAJOR) "." XSTR(MINOR) "." XSTR(GHRELEASE) "-" XSTR(GHBUILD) "-" XSTR(GHBUILDTYPE);
 
 // ADC values below THRESHOLD go to the histogram.
 // Values >= THRESHOLD are recorded as individual $E events.
 // MAX_EVENTS sized against the ATmega1284P's 16 KB SRAM: each slot costs
-// 4 bytes (event_time + event_channel), so 1000 slots is 4000 bytes — about
-// a quarter of SRAM — leaving most of it free for the stack while covering
+// 6 bytes (event_time + event_channel), so 1000 slots is 6000 bytes — a bit
+// over a third of SRAM — leaving most of it free for the stack while covering
 // well over the previous 300-event/10 s (30 Hz) cap. Above-threshold events
 // beyond this cap are still dropped (events_counter keeps counting the true
 // total; dosview detects and warns about the shortfall).
@@ -63,10 +63,15 @@ TX1/INT1 (D 11) PD3  |        | PC2 (D 18) TCK
 // Measurement buffers  (written from main-loop ADC polling)
 // ---------------------------------------------------------------------------
 uint16_t          histogram[THRESHOLD];
-volatile uint16_t event_time[MAX_EVENTS];
+volatile uint32_t event_time[MAX_EVENTS];      // ticks since block start
 volatile uint16_t event_channel[MAX_EVENTS];
 volatile uint16_t events_counter = 0;
 volatile uint16_t startSystime   = 0;
+
+// TCNT1 wraps every 8.39 s, i.e. inside one 10 s block, so event times are kept
+// on a 32-bit tick axis: timer1_high counts the TCNT1 overflows.
+uint16_t timer1_high     = 0;
+uint32_t blockStartTicks = 0;           // ticks32() at block start
 
 // ---------------------------------------------------------------------------
 // Time-keeping
@@ -116,11 +121,23 @@ ISR(PCINT3_vect)
 // ADC CONV polling on PB0
 // High CONV level means ADC conversion ready — read value via raw SPI.
 // ===========================================================================
+static inline uint32_t ticks32()
+{
+  uint16_t lo = TCNT1;
+  if (TIFR1 & (1 << TOV1))
+  {
+    TIFR1 = (1 << TOV1);            // clear by writing 1
+    timer1_high++;
+    lo = TCNT1;                     // re-read: lo may predate the overflow
+  }
+  return ((uint32_t)timer1_high << 16) | lo;
+}
+
 static inline void serviceADC()
 {
-  if (!(PINB & (1 << 0))) return;   // ignore falling edge
+  uint32_t timestamp = ticks32();
 
-  uint16_t timestamp = TCNT1;
+  if (!(PINB & (1 << 0))) return;   // ignore falling edge
 
   PORTC &= ~(1 << 2);               // DRESET LOW  (PC2)
 
@@ -144,7 +161,7 @@ static inline void serviceADC()
   {
     if (events_counter < MAX_EVENTS)
     {
-      event_time[events_counter]    = timestamp;
+      event_time[events_counter]    = timestamp - blockStartTicks;
       event_channel[events_counter] = adcVal;
     }
     events_counter++;
@@ -488,7 +505,8 @@ static inline void flushDataOut()
   memset((void*)event_time,    0, sizeof(event_time));
   memset((void*)event_channel, 0, sizeof(event_channel));
   events_counter = 0;
-  startSystime   = TCNT1;
+  blockStartTicks = ticks32();
+  startSystime    = (uint16_t)blockStartTicks;
 
   // Re-arm peak detector
   digitalWrite(DSET,   HIGH);
@@ -534,7 +552,7 @@ void StatusOut()
       Serial.print(tempC,    1);
       Serial.print(",");
       Serial.print(humidity, 1);
-      Serial.print("\n");
+      Serial.println();
     }
   }
 }
@@ -609,7 +627,8 @@ void setup()
 
   lastDataOutMs = millis();
   lastStatusMs  = millis();
-  startSystime  = TCNT1;
+  blockStartTicks = ticks32();
+  startSystime    = (uint16_t)blockStartTicks;
 }
 
 // ===========================================================================

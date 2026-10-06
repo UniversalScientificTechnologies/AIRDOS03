@@ -139,10 +139,6 @@ PCICR  |= (1 << PCIE3);  PCMSK3 |= (1 << 4);  // PD4 = PCINT28, bit 4 of PCMSK3
 | `$TIME` timing | printed at startup from EEPROM | printed on GNSS fix / re-sync |
 | `$ENV` sensors | 2x SHT31 + MS5611 | 1x SHT31-DIS ADDR=H (0x45), temp + humidity only |
 
-## Known compiler warnings
-Line 12 (`FWversion` macro expansion) produces 4x `invalid suffix on literal` —
-inherited from the original codebase; build succeeds without errors.
-
 ## Last successful build
 - RAM:   ~13.4 % (2201 B / 16384 B)
 - Flash: ~8.5 %  (11104 B / 130048 B)
