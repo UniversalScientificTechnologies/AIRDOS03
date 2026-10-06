@@ -22,13 +22,13 @@ The detector covers an energy range of approximately 40 keV to 80 MeV with an en
 
 ### Environmental sensing
 
-To support the correction of radiation data to local atmospheric conditions, AIRDOS03 includes integrated sensors for temperature and relative humidity. The temperature range spans −40 to +80 °C with an accuracy of approximately ±0.5 °C, and relative humidity is measured from 0 to 100 %RH with ±2 %RH accuracy.
+To support the correction of radiation data to local atmospheric conditions, AIRDOS03 includes integrated sensors for temperature and relative humidity. The temperature sensor measurement range spans −40 to +125 °C with an accuracy of approximately ±0.5 °C, and relative humidity is measured from 0 to 100 %RH with ±2 %RH accuracy.
 
 ![FIK-10 stratospheric balloon flight data measured with AIRDOS03](https://raw.githubusercontent.com/ODZ-UJF-AV-CR/FIK-10/refs/heads/main/doc/img/flight_data.png)
 
 ## Mechanical and electrical characteristics
 
-AIRDOS03 has a compact, lightweight form factor suitable for airframe integration. The electronics measure approximately 91 × 51 × 20 mm and have a total mass of about 40 g. The device is powered from a 5 V supply and typically draws around 3 mA, making it compatible even with small UAV platforms where power and mass budgets are limited.
+AIRDOS03 has a compact, lightweight form factor suitable for airframe integration. The electronics measure approximately 71 × 51 × 25 mm and have a total mass of about 42 g. The device is powered from a 5 V supply (4.5–5.4 V) and typically draws around 3 mA, making it compatible even with small UAV platforms where power and mass budgets are limited. The operating temperature range is −40 to +50 °C, non-condensing, at 20–80 %RH.
 
 ## Interfaces and connectivity
 
