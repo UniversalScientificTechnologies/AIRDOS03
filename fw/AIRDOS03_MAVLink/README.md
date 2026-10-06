@@ -291,3 +291,6 @@ $STOP,<count>,<tm>.<tm_s100>,<stop_systime>,<events_total>,<hist_0>,...,<hist_63
 $ENV,<count>,<tm>.<tm_s100>,<tempC>,<humidity>
 $ALIVE,<uptime_s>,<count>,<cum_pulses>,<events_min>,<gnss_synced>,<sync_age>
 ```
+
+`ALIVE` is not a message of the UST format, so it is written as a debug/comment line (`#`), which
+format readers skip.

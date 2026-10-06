@@ -102,7 +102,7 @@ def parse_alive(payload):
     _, uptime, cnt, cum_pulses, evt_min = struct.unpack_from('<BIHII', payload)
     gnss_synced = payload[15]
     sync_age = struct.unpack_from('<I', payload, 16)[0]
-    print(f"$ALIVE,{uptime},{cnt},{cum_pulses},{evt_min},{gnss_synced},{sync_age}")
+    print(f"#ALIVE,{uptime},{cnt},{cum_pulses},{evt_min},{gnss_synced},{sync_age}")
 
 
 def flush_cycle(count, cycle):
