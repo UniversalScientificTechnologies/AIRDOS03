@@ -68,6 +68,12 @@ class Cycle:
         return True
 
 
+# The firmware has no $RTCCHK packet; the lines are derived from what it does send. The device
+# clock starts at 0 on power-up (INIT) and becomes absolute with the first valid GNSS fix (OK).
+RTCCHK_REGISTERS = "reg07=0x00,reg28=0x00"   # no RTC chip on the board
+_rtcchk = {"ok_written": False}
+
+
 def parse_startup(payload):
     fmt = '<BBH16sBBBBBB'
     if len(payload) < struct.calcsize(fmt):
@@ -80,6 +86,8 @@ def parse_startup(payload):
     if fmt_major:
         print(f"$DATAFORMAT,VERSION_{fmt_major}.{fmt_minor}")
     print(f"$ADC,USTSIPIN03C,{sn},{conf1:02x}{conf2:02x}")
+    _rtcchk["ok_written"] = False
+    print(f"$RTCCHK,0.00,INIT,{RTCCHK_REGISTERS}")
 
 
 def parse_timesync(payload):
@@ -89,6 +97,9 @@ def parse_timesync(payload):
     _, synced, rtc_sec, gnss_sync, cur_unix, age = struct.unpack_from(fmt, payload)
     dt_str = unix_to_str(cur_unix) if synced else "0000-00-00 00:00:00"
     sync_time = cur_unix - rtc_sec
+    if synced and not _rtcchk["ok_written"]:
+        _rtcchk["ok_written"] = True
+        print(f"$RTCCHK,{rtc_sec}.00,OK,{RTCCHK_REGISTERS}")
     print(f"$TIME,{rtc_sec},{sync_time},{cur_unix},{age},{dt_str}")
 
 

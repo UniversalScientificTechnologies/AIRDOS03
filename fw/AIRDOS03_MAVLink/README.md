@@ -287,6 +287,8 @@ On GNSS fix or re-sync after fix loss:
 $DOS,AIRDOS03B,<major>.<minor>,0,unknown,MAVLink,<sn_hex_32chars>
 $DATAFORMAT,VERSION_<format_major>.<format_minor>
 $ADC,USTSIPIN03C,<sn_hex_32chars>,<conf1hex><conf2hex>
+$RTCCHK,0.00,INIT,reg07=0x00,reg28=0x00
+$RTCCHK,<rtc_seconds>.00,OK,reg07=0x00,reg28=0x00
 $TIME,<rtc_seconds>,<eeprom_sync_time>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM:SS>
 $START,<count>,<start_systime>
 $E,<event_time>,<event_channel>
