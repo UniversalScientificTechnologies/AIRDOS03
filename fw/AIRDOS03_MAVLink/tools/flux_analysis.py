@@ -19,6 +19,7 @@ N_HIST           = 64
 HIST_MIN_CHANNEL = 6   # channels 0..(N-1) are ignored; set according to detector threshold
 
 AIRDOS_PAYLOAD_TYPE = 4
+SUB_TIMESYNC = 0x02
 SUB_START   = 0x03
 SUB_STOP    = 0x04
 SUB_HIST_LO = 0x05
@@ -45,12 +46,24 @@ class _Cycle:
         return True
 
 
+# Unix time at which the device clock (rtc_seconds) was 0, from the last TIMESYNC packet
+_clock = {'sync_time': None}
+
+
 def _process_payload(payload, cycles, records):
     if not payload:
         return
     sub = payload[0]
 
-    if sub == SUB_START:
+    if sub == SUB_TIMESYNC:
+        fmt = '<BB4I'
+        if len(payload) < struct.calcsize(fmt):
+            return
+        _, synced, rtc_sec, _, cur_unix, _ = struct.unpack_from(fmt, payload)
+        if synced:
+            _clock['sync_time'] = cur_unix - rtc_sec
+
+    elif sub == SUB_START:
         if len(payload) < 5:
             return
         _, count, start_systime = struct.unpack_from('<BHH', payload)
@@ -125,6 +138,12 @@ for i in range(len(data['timestamp'])):
     _process_payload(payload, cycles, records)
 
 df = pd.DataFrame(records).sort_values('count').reset_index(drop=True)
+
+# Firmware of data format 2.1 reports the block time on the device clock, older firmware as
+# Unix time. A device-clock value is far below any Unix time; 0 means not synced yet.
+_on_device_clock = (df['tm_unix'] > 0) & (df['tm_unix'] < 1e8)
+if _clock['sync_time'] is not None:
+    df.loc[_on_device_clock, 'tm_unix'] += _clock['sync_time']
 
 df['total']     = df['hist_sum'] + df['events_total']
 df['flux']      = df['total']        / CYCLE_DURATION_S

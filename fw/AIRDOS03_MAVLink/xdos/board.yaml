@@ -1,0 +1,31 @@
+device: AIRDOS03B
+mcu: atmega1284
+f_cpu: 8000000
+millis_symbol: timer0_millis
+seconds_symbol: rtc_seconds
+
+decoder: [python3, ../tools/mavlink_to_airdos.py, --stdin]
+
+parts:
+  - component: i2c_eeprom
+    addr: 0x5B
+    note: serial number of the analog part, 16 B at offset 0x0800
+    params:
+      offset: "0800"
+      data: "00112233445566778899aabbccddeeff"
+
+  - component: i2c_eeprom
+    addr: 0x53
+    note: ADC configuration, 2 B at offset 0x0000
+    params:
+      offset: "0000"
+      data: "0A05"
+
+  - component: sht31
+    addr: 0x45
+
+  - component: spi_adc_pulse
+    pins: {conv: PB0, reset: PC2}
+
+  - component: gnss
+    pins: {pps: PD4}

@@ -64,15 +64,33 @@ class Cycle:
         return True
 
 
+RTCCHK_REGISTERS = "reg07=0x00,reg28=0x00"   # no RTC chip on the board
+_rtcchk = {"ok_written": False}
+
+
 def parse_startup(payload):
-    fmt = '<BBH16sBBBB4s'
+    fmt = '<BBH16sBBBBBB'
     if len(payload) < struct.calcsize(fmt):
         return
-    _, threshold, max_events, sn_raw, conf1, conf2, major, minor, _ = \
+    _, threshold, max_events, sn_raw, conf1, conf2, major, minor, fmt_major, fmt_minor = \
         struct.unpack_from(fmt, payload)
     sn = sn_hex(sn_raw)
-    print(f"$DOS,AIRDOS03B,{major}.{minor},0,unknown,MAVLink,{sn}")
+    # firmware that predates the build identity sends a 29-byte packet without it
+    version, git_hash, build_type = f"{major}.{minor}", "unknown", "MAVLink"
+    build_fmt = '<BH8s20s'
+    if len(payload) >= struct.calcsize(fmt) + struct.calcsize(build_fmt):
+        release, build, type_raw, hash_raw = \
+            struct.unpack_from(build_fmt, payload, struct.calcsize(fmt))
+        build_type = type_raw.rstrip(b"\0").decode("ascii", errors="replace")
+        version = f"{major}.{minor}.{release}-{build}-{build_type}"
+        git_hash = hash_raw.hex()
+    print(f"$DOS,AIRDOS03B,{version},0,{git_hash},{build_type},{sn}")
+    # firmware older than the 2.1 format leaves these bytes zero and declares no format
+    if fmt_major:
+        print(f"$DATAFORMAT,VERSION_{fmt_major}.{fmt_minor}")
     print(f"$ADC,USTSIPIN03C,{sn},{conf1:02x}{conf2:02x}")
+    _rtcchk["ok_written"] = False
+    print(f"$RTCCHK,0.00,INIT,{RTCCHK_REGISTERS}")
 
 
 def parse_timesync(payload):
@@ -81,7 +99,11 @@ def parse_timesync(payload):
         return
     _, synced, rtc_sec, gnss_sync, cur_unix, age = struct.unpack_from(fmt, payload)
     dt_str = unix_to_str(cur_unix) if synced else "0000-00-00 00:00:00"
-    print(f"$TIME,{rtc_sec},{gnss_sync},{cur_unix},{age},{dt_str}")
+    sync_time = cur_unix - rtc_sec
+    if synced and not _rtcchk["ok_written"]:
+        _rtcchk["ok_written"] = True
+        print(f"$RTCCHK,{rtc_sec}.00,OK,{RTCCHK_REGISTERS}")
+    print(f"$TIME,{rtc_sec},{sync_time},{cur_unix},{age},{dt_str}")
 
 
 def parse_env(payload):
@@ -98,7 +120,7 @@ def parse_alive(payload):
     _, uptime, cnt, cum_pulses, evt_min = struct.unpack_from('<BIHII', payload)
     gnss_synced = payload[15]
     sync_age = struct.unpack_from('<I', payload, 16)[0]
-    print(f"$ALIVE,{uptime},{cnt},{cum_pulses},{evt_min},{gnss_synced},{sync_age}")
+    print(f"#ALIVE,{uptime},{cnt},{cum_pulses},{evt_min},{gnss_synced},{sync_age}")
 
 
 def flush_cycle(count, cycle):

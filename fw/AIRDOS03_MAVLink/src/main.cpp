@@ -6,6 +6,13 @@
 #define MINOR 3
 #include "githash.h"
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
+// Version of the UST data format 
+#define DATAFORMAT_MAJOR 2
+#define DATAFORMAT_MINOR 1
+
 // ADC values below THRESHOLD go to the histogram.
 // Values >= THRESHOLD are recorded as individual $E events.
 // MAX_EVENTS sized against the ATmega1284P's 16 KB SRAM: each slot costs
@@ -38,9 +45,12 @@ static void SendTunnelData(uint8_t *data, uint8_t len,
                            uint8_t payload_type = 4,
                            uint8_t sysid = 1, uint8_t compid = 1)
 {
+  uint8_t payload[MAVLINK_MSG_TUNNEL_FIELD_PAYLOAD_LEN] = {0};
+  memcpy(payload, data, len);
+
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_tunnel_pack(1, 10, &msg, sysid, compid, payload_type, len, data);
+  mavlink_msg_tunnel_pack(1, 10, &msg, sysid, compid, payload_type, len, payload);
   uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
   hs.write(buf, n);
 }
@@ -49,11 +59,7 @@ static void SendTunnelData(uint8_t *data, uint8_t len,
 static void SendTunnelBroadcast(uint8_t *data, uint8_t len,
                                 uint8_t payload_type = 4)
 {
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_tunnel_pack(1, 10, &msg, 0, 0, payload_type, len, data);
-  uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
-  hs.write(buf, n);
+  SendTunnelData(data, len, payload_type, 0, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +192,9 @@ static uint32_t nmeaToUnix(uint8_t day, uint8_t month, uint8_t year2,
        + sec;
 }
 
+// tm      = device clock (rtc_seconds) - the same axis TIMESYNC.rtc_seconds reports; a reader
+//           turns it into a calendar time using TIMESYNC (0 if not yet synced)
+// tm_s100 = hundredths of second derived from TCNT1 since last PPS
 static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
 {
   if (!gnss_synced)
@@ -202,7 +211,7 @@ static void getCurrentTime(uint32_t &tm, uint8_t &tm_s100)
   uint16_t sub = tc1 - pps;
   tm_s100 = (uint8_t)((uint32_t)sub * 128UL / 10000UL);
   if (tm_s100 > 99u) tm_s100 = 99u;
-  tm = gnss_sync_unix + (rSec - sync_rtc_seconds);
+  tm = rSec;
 }
 
 // ===========================================================================
@@ -234,6 +243,9 @@ static void SendTimeSync()
 // 0x08 — ENV (17 bytes)
 static void SendENV()
 {
+  if (count == 0) return;   // no block has ended yet
+
+  uint16_t block = count - 1;
   uint32_t tm; uint8_t tm_s100;
   getCurrentTime(tm, tm_s100);
 
@@ -255,7 +267,7 @@ static void SendENV()
   uint8_t reserved = 0;
   uint8_t buf[17];
   buf[0] = 0x08;
-  memcpy(buf + 1, &count,    2);
+  memcpy(buf + 1, &block,    2);
   memcpy(buf + 3, &tm,       4);
   buf[7] = tm_s100;
   buf[8] = reserved;
@@ -504,6 +516,14 @@ static inline void flushDataOut()
   digitalWrite(LED2, LOW);
 }
 
+static uint8_t hexValue(char c)
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return 0;
+}
+
 // ===========================================================================
 // setup
 // ===========================================================================
@@ -554,14 +574,16 @@ void setup()
   ADCconf1 = Wire.read();
   ADCconf2 = Wire.read();
 
-  // 0x01 — STARTUP (29 bytes)
+  // 0x01 — STARTUP (57 bytes)
   {
     uint8_t  threshold  = THRESHOLD;
     uint16_t max_events = MAX_EVENTS;
     uint8_t  fw_major   = MAJOR;
     uint8_t  fw_minor   = MINOR;
+    uint8_t  fw_release = GHRELEASE;
+    uint16_t fw_build   = GHBUILD;
 
-    uint8_t buf[29] = {0};
+    uint8_t buf[57] = {0};
     buf[0] = 0x01;
     buf[1] = threshold;
     memcpy(buf +  2, &max_events,   2);
@@ -570,12 +592,17 @@ void setup()
     buf[21] = ADCconf2;
     buf[22] = fw_major;
     buf[23] = fw_minor;
-    // buf[24..28] = reserved (already zero)
+    buf[24] = DATAFORMAT_MAJOR;
+    buf[25] = DATAFORMAT_MINOR;
+    buf[26] = fw_release;
+    memcpy(buf + 27, &fw_build, 2);
+    // build type as text, zero padded: User, CIBuild, Beta, Release
+    strncpy((char *)buf + 29, XSTR(GHBUILDTYPE), 8);
+    // the commit the firmware was built from: githash starts with its 40 hex digits
+    for (uint8_t i = 0; i < 20; i++)
+      buf[37 + i] = (hexValue(githash[2 * i]) << 4) | hexValue(githash[2 * i + 1]);
     SendTunnelData(buf, sizeof(buf));
   }
-
-  // Initial ENV reading
-  SendENV();
 
   digitalWrite(LED1, LOW);
   digitalWrite(LED2, LOW);

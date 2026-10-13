@@ -74,7 +74,7 @@ All multi-byte integers are **little-endian**.
 
 | Byte 0 | Name            | Corresponds to    | Payload size |
 |--------|-----------------|-------------------|--------------|
-| 0x01   | AIRDOS_STARTUP  | `$DOS` + `$ADC`   | 29 B         |
+| 0x01   | AIRDOS_STARTUP  | `$DOS` + `$DATAFORMAT` + `$ADC` | 57 B |
 | 0x02   | AIRDOS_TIMESYNC | `$TIME`           | 18 B         |
 | 0x03   | AIRDOS_START    | `$START`          | 5 B          |
 | 0x04   | AIRDOS_STOP     | `$STOP` header    | 14 B         |
@@ -86,24 +86,30 @@ All multi-byte integers are **little-endian**.
 
 ---
 
-### 0x01 — STARTUP (29 bytes)
+### 0x01 — STARTUP (57 bytes)
 
-Sent once at startup. Provides device identification (`$DOS`, `$ADC`).
+Sent once at startup. Provides device identification (`$DOS`, `$ADC`) and the version of
+the UST data format the packets are meant to be decoded into (`$DATAFORMAT`).
 
 ```
 Offset  Size  Field
   0      1    sub_type        = 0x01
   1      1    threshold       // THRESHOLD constant (64)
-  2      2    max_events      // MAX_EVENTS constant (300)
+  2      2    max_events      // MAX_EVENTS constant (1000)
   4     16    serial_number   // raw bytes from EEPROM 0x5B offset 0x0800
  20      1    adc_conf1       // from EEPROM 0x53 offset 0x0000
  21      1    adc_conf2       // from EEPROM 0x53 offset 0x0001
  22      1    fw_major        // MAJOR version
  23      1    fw_minor        // MINOR version
- 24      4    reserved        // zero
+ 24      1    format_major    // UST data format version, 2 for format 2.1
+ 25      1    format_minor    // 1 for format 2.1
+ 26      1    fw_release      // release number of the build
+ 27      2    fw_build        // build number
+ 29      8    build_type      // ASCII, zero padded: User, CIBuild, Beta, Release
+ 37     20    git_hash        // commit the firmware was built from, raw bytes
 ```
 
-Python: `struct.unpack_from('<BBH16sBBBB4s', payload)`
+Python: `struct.unpack_from('<BBH16sBBBBBBBH8s20s', payload)`
 
 ---
 
@@ -148,7 +154,7 @@ Sent after events, before histogram packets (`$STOP` header fields).
 Offset  Size  Field
   0      1    sub_type        = 0x04
   1      2    count           // same cycle index as START
-  3      4    tm              // Unix time at end of window (0 if not synced)
+  3      4    tm              // device clock (rtc_seconds) at end of window (0 if not synced)
   7      1    tm_s100         // hundredths of second (0–99)
   8      2    stop_systime    // TCNT1 at end of window
  10      2    events_total    // total events_counter (may exceed MAX_EVENTS)
@@ -204,13 +210,13 @@ Python events: `struct.unpack_from(f'<{2*n}H', payload[9:9+n*4])` — pairs (tim
 
 ### 0x08 — ENV (17 bytes)
 
-Sent at startup and every 30 s (`$ENV`).
+Sent every 30 s once the first measurement cycle has ended (`$ENV`).
 
 ```
 Offset  Size  Field
   0      1    sub_type        = 0x08
-  1      2    count           // measurement cycle index
-  3      4    tm              // Unix time (0 if not synced)
+  1      2    count           // index of the cycle whose STOP came last
+  3      4    tm              // device clock (rtc_seconds) (0 if not synced)
   7      1    tm_s100         // hundredths of second
   8      1    reserved
   9      4    temperature     // float32, °C (IEEE 754 single, little-endian)
@@ -256,7 +262,6 @@ sync_age = struct.unpack_from('<I', payload, 16)[0]
 ```
 At setup():
   STARTUP  (0x01)
-  ENV      (0x08)   ← initial sensor reading
 
 Every 10 s:
   START    (0x03)
@@ -282,12 +287,22 @@ On GNSS fix or re-sync after fix loss:
 `tools/mavlink_to_airdos.py` reconstructs AIRDOS04-compatible text:
 
 ```
-$DOS,AIRDOS03B,<major>.<minor>,0,unknown,MAVLink,<sn_hex_32chars>
+$DOS,AIRDOS03B,<major>.<minor>.<release>-<build>-<build_type>,0,<git_hash_40chars>,<build_type>,<sn_hex_32chars>
+$DATAFORMAT,VERSION_<format_major>.<format_minor>
 $ADC,USTSIPIN03C,<sn_hex_32chars>,<conf1hex><conf2hex>
-$TIME,<rtc_seconds>,<gnss_sync_unix>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM:SS>
+$RTCCHK,0.00,INIT,reg07=0x00,reg28=0x00
+$RTCCHK,<rtc_seconds>.00,OK,reg07=0x00,reg28=0x00
+$TIME,<rtc_seconds>,<eeprom_sync_time>,<current_unix>,<sync_age>,<YYYY-MM-DD HH:MM:SS>
 $START,<count>,<start_systime>
 $E,<event_time>,<event_channel>
 $STOP,<count>,<tm>.<tm_s100>,<stop_systime>,<events_total>,<hist_0>,...,<hist_63>
 $ENV,<count>,<tm>.<tm_s100>,<tempC>,<humidity>
-$ALIVE,<uptime_s>,<count>,<cum_pulses>,<events_min>,<gnss_synced>,<sync_age>
+#ALIVE,<uptime_s>,<count>,<cum_pulses>,<events_min>,<gnss_synced>,<sync_age>
 ```
+
+`ALIVE` is not a message of the UST format, so it is written as a debug/comment line (`#`), which
+format readers skip.
+
+`<eeprom_sync_time>` in `$TIME` is the Unix time at which `rtc_seconds` was 0, as the UST format
+defines it. The decoders compute it as `current_unix - rtc_seconds`; the TIMESYNC packet itself
+carries the moment of the GNSS sync (`gnss_sync_unix`) instead.
