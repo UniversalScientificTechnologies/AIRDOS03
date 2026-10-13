@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import math
+import os
 import struct
 import sys
 from datetime import datetime, timezone
@@ -230,25 +231,30 @@ def main():
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     args = parser.parse_args()
 
-    if args.stdin:
-        conn = mavutil.mavlink_connection(
-            "file:/dev/stdin",
-            dialect="common",
-        )
-    else:
-        conn = mavutil.mavlink_connection(
-            args.port,
-            baud=args.baud,
-            dialect="common",
-        )
-
     cycles = {}
+
+    if args.stdin:
+        os.environ["MAVLINK20"] = "1"
+        mavutil.set_dialect("common")
+        stream = mavutil.mavlink.MAVLink(None)
+        stream.robust_parsing = True
+        while True:
+            chunk = sys.stdin.buffer.read1(4096)
+            if not chunk:
+                break
+            for msg in stream.parse_buffer(chunk) or []:
+                process_message(msg, cycles)
+        return
+
+    conn = mavutil.mavlink_connection(
+        args.port,
+        baud=args.baud,
+        dialect="common",
+    )
 
     while True:
         msg = conn.recv_match(blocking=True, timeout=5.0)
         if msg is None:
-            if args.stdin:
-                break
             continue
         process_message(msg, cycles)
 
