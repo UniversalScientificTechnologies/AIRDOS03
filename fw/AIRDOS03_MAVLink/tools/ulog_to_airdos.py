@@ -75,7 +75,16 @@ def parse_startup(payload):
     _, threshold, max_events, sn_raw, conf1, conf2, major, minor, fmt_major, fmt_minor = \
         struct.unpack_from(fmt, payload)
     sn = sn_hex(sn_raw)
-    print(f"$DOS,AIRDOS03B,{major}.{minor},0,unknown,MAVLink,{sn}")
+    # firmware that predates the build identity sends a 29-byte packet without it
+    version, git_hash, build_type = f"{major}.{minor}", "unknown", "MAVLink"
+    build_fmt = '<BH8s20s'
+    if len(payload) >= struct.calcsize(fmt) + struct.calcsize(build_fmt):
+        release, build, type_raw, hash_raw = \
+            struct.unpack_from(build_fmt, payload, struct.calcsize(fmt))
+        build_type = type_raw.rstrip(b"\0").decode("ascii", errors="replace")
+        version = f"{major}.{minor}.{release}-{build}-{build_type}"
+        git_hash = hash_raw.hex()
+    print(f"$DOS,AIRDOS03B,{version},0,{git_hash},{build_type},{sn}")
     # firmware older than the 2.1 format leaves these bytes zero and declares no format
     if fmt_major:
         print(f"$DATAFORMAT,VERSION_{fmt_major}.{fmt_minor}")

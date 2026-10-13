@@ -12,8 +12,9 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 
-from ust_format_checker.platformio import SCENARIO
+from ust_format_checker.platformio import BOARD, SCENARIO
 from ust_format_checker.requirements import load_requirements
+from ust_format_checker.scenario import load_board
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -42,7 +43,15 @@ def main() -> int:
     findings = read(findings_path)
     device, fw_version, commit, build_type = identity(read(build_dir / "xdos" / "capture.txt"))
     requirements = load_requirements()
+    decoder = load_board(project / BOARD).decoder
     scenario = re.search(r"^name:\s*(\S+)", read(project / SCENARIO), re.M)
+
+    method = ("The released binary is run in the simavr simulator against the board model "
+              f"`{BOARD}`, scenario `{scenario.group(1) if scenario else 'default'}`")
+    if decoder:
+        # the firmware does not send the format itself: say what the verdict covers
+        method += (f". Its output is decoded by `{' '.join(decoder)}` before the checks, so the "
+                   "result covers the firmware together with the decoder")
 
     counts = re.search(r"(\d+) error, (\d+) warning, (\d+) info", last_line(findings))
     if counts:
@@ -77,8 +86,7 @@ def main() -> int:
         f"| Commit | `{commit}` |",
         f"| Format | [version {requirements.format_version}]({requirements.version_url}) |",
         f"| Checker | `ust-format-checker` {version('ust-format-checker')}, strict mode (warnings block the release) |",
-        "| Method | The released binary is run in the simavr simulator against the board model "
-        f"`xdos/board.yaml`, scenario `{scenario.group(1) if scenario else 'default'}` |",
+        f"| Method | {method} |",
         f"| Device tests | {last_line(read(tests_path)) or 'none'} |",
         "",
         "The run is a simulation. Device identifiers in it are placeholders of the board model, "

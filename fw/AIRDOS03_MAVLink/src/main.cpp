@@ -6,6 +6,9 @@
 #define MINOR 3
 #include "githash.h"
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
 // Version of the UST data format 
 #define DATAFORMAT_MAJOR 2
 #define DATAFORMAT_MINOR 1
@@ -513,6 +516,14 @@ static inline void flushDataOut()
   digitalWrite(LED2, LOW);
 }
 
+static uint8_t hexValue(char c)
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return 0;
+}
+
 // ===========================================================================
 // setup
 // ===========================================================================
@@ -563,14 +574,16 @@ void setup()
   ADCconf1 = Wire.read();
   ADCconf2 = Wire.read();
 
-  // 0x01 — STARTUP (29 bytes)
+  // 0x01 — STARTUP (57 bytes)
   {
     uint8_t  threshold  = THRESHOLD;
     uint16_t max_events = MAX_EVENTS;
     uint8_t  fw_major   = MAJOR;
     uint8_t  fw_minor   = MINOR;
+    uint8_t  fw_release = GHRELEASE;
+    uint16_t fw_build   = GHBUILD;
 
-    uint8_t buf[29] = {0};
+    uint8_t buf[57] = {0};
     buf[0] = 0x01;
     buf[1] = threshold;
     memcpy(buf +  2, &max_events,   2);
@@ -581,7 +594,13 @@ void setup()
     buf[23] = fw_minor;
     buf[24] = DATAFORMAT_MAJOR;
     buf[25] = DATAFORMAT_MINOR;
-    // buf[26..28] = reserved (already zero)
+    buf[26] = fw_release;
+    memcpy(buf + 27, &fw_build, 2);
+    // build type as text, zero padded: User, CIBuild, Beta, Release
+    strncpy((char *)buf + 29, XSTR(GHBUILDTYPE), 8);
+    // the commit the firmware was built from: githash starts with its 40 hex digits
+    for (uint8_t i = 0; i < 20; i++)
+      buf[37 + i] = (hexValue(githash[2 * i]) << 4) | hexValue(githash[2 * i + 1]);
     SendTunnelData(buf, sizeof(buf));
   }
 

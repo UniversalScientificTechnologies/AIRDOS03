@@ -74,7 +74,7 @@ All multi-byte integers are **little-endian**.
 
 | Byte 0 | Name            | Corresponds to    | Payload size |
 |--------|-----------------|-------------------|--------------|
-| 0x01   | AIRDOS_STARTUP  | `$DOS` + `$DATAFORMAT` + `$ADC` | 29 B |
+| 0x01   | AIRDOS_STARTUP  | `$DOS` + `$DATAFORMAT` + `$ADC` | 57 B |
 | 0x02   | AIRDOS_TIMESYNC | `$TIME`           | 18 B         |
 | 0x03   | AIRDOS_START    | `$START`          | 5 B          |
 | 0x04   | AIRDOS_STOP     | `$STOP` header    | 14 B         |
@@ -86,7 +86,7 @@ All multi-byte integers are **little-endian**.
 
 ---
 
-### 0x01 — STARTUP (29 bytes)
+### 0x01 — STARTUP (57 bytes)
 
 Sent once at startup. Provides device identification (`$DOS`, `$ADC`) and the version of
 the UST data format the packets are meant to be decoded into (`$DATAFORMAT`).
@@ -103,10 +103,13 @@ Offset  Size  Field
  23      1    fw_minor        // MINOR version
  24      1    format_major    // UST data format version, 2 for format 2.1
  25      1    format_minor    // 1 for format 2.1
- 26      3    reserved        // zero
+ 26      1    fw_release      // release number of the build
+ 27      2    fw_build        // build number
+ 29      8    build_type      // ASCII, zero padded: User, CIBuild, Beta, Release
+ 37     20    git_hash        // commit the firmware was built from, raw bytes
 ```
 
-Python: `struct.unpack_from('<BBH16sBBBBBB', payload)`
+Python: `struct.unpack_from('<BBH16sBBBBBBBH8s20s', payload)`
 
 ---
 
@@ -284,7 +287,7 @@ On GNSS fix or re-sync after fix loss:
 `tools/mavlink_to_airdos.py` reconstructs AIRDOS04-compatible text:
 
 ```
-$DOS,AIRDOS03B,<major>.<minor>,0,unknown,MAVLink,<sn_hex_32chars>
+$DOS,AIRDOS03B,<major>.<minor>.<release>-<build>-<build_type>,0,<git_hash_40chars>,<build_type>,<sn_hex_32chars>
 $DATAFORMAT,VERSION_<format_major>.<format_minor>
 $ADC,USTSIPIN03C,<sn_hex_32chars>,<conf1hex><conf2hex>
 $RTCCHK,0.00,INIT,reg07=0x00,reg28=0x00
